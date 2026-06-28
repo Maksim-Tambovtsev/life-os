@@ -1,0 +1,315 @@
+/* ── Dashboard Tab ── */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.dashHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashGreeting {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.dashDate {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dashAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #6B3FFF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: #fff;
+}
+
+.dashMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.dashMetric {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.dashMetric:hover {
+  border-color: var(--border-2);
+}
+
+.dashMetricVal {
+  font-family: var(--font-head);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dashMetricLabel {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dashChart {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  flex: 1;
+}
+
+.dashChartLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 14px;
+  letter-spacing: 0.05em;
+}
+
+.dashBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 80px;
+}
+
+.dashBar {
+  flex: 1;
+  background: linear-gradient(to top, var(--accent), rgba(77, 159, 255, 0.3));
+  border-radius: 4px 4px 2px 2px;
+  min-height: 4px;
+}
+
+.dashDays {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+}
+
+/* ── Telegram Tab ── */
+.tg {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0;
+}
+
+.tgHeader {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.tgBot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tgBotIcon {
+  font-size: 28px;
+  background: var(--panel-2);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tgBotName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tgBotStatus {
+  font-size: 12px;
+  color: #4CAF50;
+}
+
+.tgMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.tgMessages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tgMessages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tgMessages::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 2px;
+}
+
+.tgMsg {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tgMsgBot {
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 4px 14px 14px 14px;
+  align-self: flex-start;
+}
+
+.tgMsgUser {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 14px 4px 14px 14px;
+  align-self: flex-end;
+}
+
+.tgInput {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted-2);
+}
+
+.tgSend {
+  color: var(--accent);
+  font-size: 16px;
+  transition: transform 0.2s;
+}
+
+.tgSend:hover {
+  transform: translateX(2px);
+}
+
+/* ── AI Tab ── */
+.ai {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.aiPrompt {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.aiUser {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aiPromptText {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.aiResponse {
+  background: rgba(77, 159, 255, 0.05);
+  border: 1px solid rgba(77, 159, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  flex: 1;
+}
+
+.aiLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aiDot {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.aiText {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.aiInsights {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aiInsight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: border-color 0.2s;
+}
+
+.aiInsight:hover {
+  border-color: var(--border-2);
+  color: var(--text);
+}
+
+.aiInsightIcon {
+  font-size: 16px;
+}

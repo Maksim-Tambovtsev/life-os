@@ -1,0 +1,40 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 56px;
+}
+
+.center {
+  align-items: center;
+  text-align: center;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.title {
+  font-family: var(--font-head);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+.sub {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 540px;
+  line-height: 1.6;
+}
+
+.center .sub {
+  max-width: 600px;
+}

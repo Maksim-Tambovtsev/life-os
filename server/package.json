@@ -1,0 +1,24 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "bot": "node bot.js",
+    "api": "node api.js",
+    "cron": "node cron.js",
+    "start": "concurrently \"node bot.js\" \"node api.js\" \"node cron.js\" \"npm run dev --prefix ../main\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0",
+    "better-sqlite3": "^12.11.1",
+    "concurrently": "^10.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-cron": "^4.5.0",
+    "telegraf": "^4.16.3"
+  }
+}

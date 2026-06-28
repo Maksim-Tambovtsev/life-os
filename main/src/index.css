@@ -1,0 +1,118 @@
+:root {
+  /* фон */
+  --bg: #08090C;
+  --bg-2: #0E1217;
+  --panel: #12161D;
+  --panel-2: #17212B;
+  /* акцент */
+  --accent: #4D9FFF;
+  --accent-2: #5BA7FF;
+  --accent-3: #7FBBFF;
+  --cyan: #29B6F6;
+  /* текст */
+  --text: #EAEEF3;
+  --muted: #9AA3AE;
+  --muted-2: #6B7480;
+  /* границы и свечения */
+  --border: rgba(255, 255, 255, .06);
+  --border-2: rgba(255, 255, 255, .10);
+  --glow: rgba(77, 159, 255, .30);
+  --glow-sm: rgba(77, 159, 255, .15);
+  /* шрифты */
+  --font-head: 'Space Grotesk', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  /* отступы секций */
+  --section-py: 96px;
+  --section-px: clamp(20px, 5vw, 80px);
+  --max-w: 1200px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+/* ── анимации ── */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes revealX {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes growW {
+  from { width: 0; }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── утилиты ── */
+.section {
+  padding: var(--section-py) var(--section-px);
+  max-width: var(--max-w);
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --section-py: 64px;
+  }
+}
