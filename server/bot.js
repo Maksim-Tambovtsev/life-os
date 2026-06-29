@@ -74,9 +74,8 @@ bot.command('start', async (ctx) => {
   if (isOnboarded(String(chatId))) {
     const user = getUser(String(chatId));
     await ctx.reply(
-      `С возвращением, ${user.name}! 👋\n\n` +
-      `Твоя цель: ${user.goal_year}\n\n` +
-      `Команды:\n/checkin — ежедневный чек-ин\nПросто напиши — поговорим`
+      `Привет, ${user.name}! Рад снова видеть тебя. 👋\n\n` +
+      `Напиши /checkin для чекина или просто напиши что думаешь.`
     );
     return;
   }
