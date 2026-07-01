@@ -1,7 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'checkins.db'));
+const dbPath = process.env.DB_PATH || './checkins.db';
+const db = new Database(dbPath);
 
 // Таблица чек-инов
 db.exec(`
