@@ -1,10 +1,12 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
-const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress } = require('./db');
+const Anthropic = require('@anthropic-ai/sdk');
+const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection } = require('./db');
 const { coachReply, chatReply, analyzeGoalProgress } = require('./coach');
-const { detectMode } = require('./prompts');
+const { detectMode, REFLECTION_QUESTIONS, getPrompt } = require('./prompts');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // sessions[chatId] = {
 //   type: 'onboarding' | 'checkin' | null,
@@ -71,6 +73,114 @@ function getMainKeyboard() {
     ['📝 Рефлексия', '💪 Здоровье'],
     ['📊 Анализ', '💬 Поговорить'],
   ]).resize();
+}
+
+const REFLECTION_CONFIRMATIONS = ['Понял.', 'Ясно.', 'Хорошо.', 'Принято.', 'Ок, дальше.'];
+
+function getReflectionQuestion(stepIndex, user) {
+  if (stepIndex === 0) {
+    const previousPlan = user?.last_tomorrow_plan;
+    if (previousPlan) {
+      return `Что сделал из вчерашних планов — «${previousPlan}»?`;
+    }
+    return 'Как прошло начало дня?';
+  }
+
+  return REFLECTION_QUESTIONS[stepIndex];
+}
+
+function getReflectionConfirmation(session) {
+  let candidate = REFLECTION_CONFIRMATIONS[Math.floor(Math.random() * REFLECTION_CONFIRMATIONS.length)];
+  while (session.lastConfirmation && candidate === session.lastConfirmation) {
+    candidate = REFLECTION_CONFIRMATIONS[Math.floor(Math.random() * REFLECTION_CONFIRMATIONS.length)];
+  }
+  session.lastConfirmation = candidate;
+  return candidate;
+}
+
+async function startReflectionFlow(ctx, chatId, session) {
+  const user = getUser(String(chatId));
+  session.type = 'reflection';
+  session.step = 0;
+  session.reflectionStep = 0;
+  session.reflectionAnswers = [];
+  session.lastConfirmation = null;
+  session.data = { user_id: String(chatId) };
+  await ctx.reply(getReflectionQuestion(0, user), Markup.removeKeyboard());
+}
+
+async function summarizeReflection(answers, user) {
+  const prompt = [
+    'Сделай короткий итог рефлексии по сферам жизни: работа, здоровье, отношения, внутреннее состояние.',
+    'Отвечай коротко, 3-4 предложения, без списков из 10 пунктов.',
+    'Ответы пользователя:',
+    ...answers.map((answer, index) => `${index + 1}. ${answer}`),
+  ].join('\n');
+
+  const system = `${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\nТы делаешь итог дня по сферам жизни: работа, здоровье, отношения, внутреннее состояние. Отвечай коротко и по делу.`;
+
+  try {
+    const response = await anthropicClient.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 300,
+      system,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return response.content[0].text;
+  } catch (error) {
+    console.error('Reflection summary error:', error);
+    return 'Рефлексия сохранена. Сегодня ты уже сделал важный шаг к ясности.';
+  }
+}
+
+async function handleReflectionFlow(ctx, chatId, session) {
+  const answer = ctx.message.text.trim();
+  const user = getUser(String(chatId));
+  const stepIndex = session.reflectionStep ?? 0;
+
+  if (!answer) {
+    await ctx.reply('Напиши хоть пару слов, чтобы продолжить.');
+    return;
+  }
+
+  session.reflectionAnswers[stepIndex] = answer;
+  session.reflectionStep += 1;
+
+  if (session.reflectionStep < REFLECTION_QUESTIONS.length) {
+    const confirmation = getReflectionConfirmation(session);
+    const nextQuestion = getReflectionQuestion(session.reflectionStep, user);
+    await ctx.reply(`${confirmation}\n\n${nextQuestion}`);
+    return;
+  }
+
+  const reflectionDate = new Date().toISOString().slice(0, 10);
+  const summary = await summarizeReflection(session.reflectionAnswers, user);
+  saveReflection({
+    user_id: String(chatId),
+    date: reflectionDate,
+    answers: session.reflectionAnswers,
+    summary,
+  });
+
+  const updatedUser = {
+    user_id: String(chatId),
+    name: user?.name,
+    goal_year: user?.goal_year,
+    priority: user?.priority,
+    reminder_time: user?.reminder_time,
+    onboarded: user?.onboarded ?? 1,
+    last_tomorrow_plan: session.reflectionAnswers[7] || '',
+  };
+  saveUser(updatedUser);
+
+  session.type = null;
+  session.step = 0;
+  session.data = {};
+  session.reflectionStep = 0;
+  session.reflectionAnswers = [];
+  session.lastConfirmation = null;
+
+  await ctx.reply(`📝 Итог рефлексии сохранён.\n\n${summary}`, getMainKeyboard());
 }
 
 async function showProfile(ctx, chatId) {
@@ -212,10 +322,16 @@ bot.on('text', async (ctx) => {
 
   // Главное меню кнопок (обрабатываем первыми)
   if (text === '📝 Рефлексия') {
-    session.type = 'reflection';
-    session.step = 0;
-    session.data = { user_id: String(chatId) };
-    await ctx.reply('Давай рефлексировать. Расскажи в двух-трёх предложениях, как прошёл твой день.');
+    if (!isOnboarded(String(chatId))) {
+      session.type = 'onboarding';
+      session.step = 0;
+      session.data = { user_id: String(chatId) };
+      await ctx.reply('Сначала познакомимся! 👋');
+      await askOnboardingStep(ctx, ONBOARDING_STEPS[0]);
+      return;
+    }
+
+    await startReflectionFlow(ctx, chatId, session);
     return;
   }
 
@@ -263,6 +379,11 @@ bot.on('text', async (ctx) => {
     session.editField = config.field;
     session.data = {};
     await ctx.reply(config.question, Markup.removeKeyboard());
+    return;
+  }
+
+  if (session.type === 'reflection') {
+    await handleReflectionFlow(ctx, chatId, session);
     return;
   }
 

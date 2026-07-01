@@ -5,6 +5,17 @@ const BASE = `Ты — Life OS, персональный AI-коуч.
 Правила: отвечай коротко и прямо. Без вводных 'Конечно!', 'Отлично!', 'Хороший вопрос!'.
 Один вопрос ИЛИ одна рекомендация — не список из пяти. Максимум 4-5 предложений.`;
 
+const REFLECTION_QUESTIONS = [
+  'Что сделал из вчерашних планов? {previousPlanText}',
+  'Какие действия приблизили к цели?',
+  'Что получилось хорошо?',
+  'Что дало энергию?',
+  'Кому дал подтверждение? {supportContext}',
+  'Что тормозило — узкое место?',
+  'Что можно было сделать эффективнее?',
+  'Что хочется сделать завтра?',
+];
+
 // ─── Пять агентов ─────────────────────────────────────────────────────────────
 
 const MODE_HEALTH = {
@@ -315,4 +326,4 @@ function getPrompt(mode, userData = {}) {
   return agent.system.replace("{BASE}", filledBase);
 }
 
-module.exports = { AGENTS, detectMode, getPrompt };
+module.exports = { AGENTS, detectMode, getPrompt, REFLECTION_QUESTIONS };

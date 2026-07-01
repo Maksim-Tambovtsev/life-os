@@ -29,14 +29,31 @@ db.exec(`
     priority      TEXT,    -- здоровье / продуктивность / баланс
     reminder_time TEXT DEFAULT '21:00',
     onboarded     INTEGER DEFAULT 0, -- 0=нет, 1=да
+    last_tomorrow_plan TEXT,
     created_at    TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Таблица рефлексий
+ db.exec(`
+   CREATE TABLE IF NOT EXISTS reflections (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     user_id TEXT NOT NULL,
+     date TEXT NOT NULL,
+     answers TEXT NOT NULL,
+     summary TEXT,
+     created_at TEXT DEFAULT (datetime('now'))
+   )
+ `);
 
 // Добавляем goal_progress в существующую таблицу, если колонки ещё нет
 // (для пользователей, у которых БД уже создана без этого поля)
 try {
   db.exec('ALTER TABLE checkins ADD COLUMN goal_progress INTEGER');
+} catch (_) { /* колонка уже существует — ок */ }
+
+try {
+  db.exec('ALTER TABLE users ADD COLUMN last_tomorrow_plan TEXT');
 } catch (_) { /* колонка уже существует — ок */ }
 
 // ─── Checkins ─────────────────────────────────────────────────────────────────
@@ -55,6 +72,21 @@ function getAll(userId) {
   return db.prepare(
     'SELECT * FROM checkins WHERE user_id = ? ORDER BY date DESC'
   ).all(userId);
+}
+
+function saveReflection(obj) {
+  const stmt = db.prepare(`
+    INSERT INTO reflections (user_id, date, answers, summary)
+    VALUES (@user_id, @date, @answers, @summary)
+  `);
+  return stmt.run({
+    ...obj,
+    answers: typeof obj.answers === 'string' ? obj.answers : JSON.stringify(obj.answers),
+  });
+}
+
+function getLastReflection(userId) {
+  return db.prepare('SELECT * FROM reflections WHERE user_id = ? ORDER BY date DESC LIMIT 1').get(userId) || null;
 }
 
 function getLastNDays(userId, n) {
@@ -102,14 +134,15 @@ function getUser(userId) {
 // Создаёт или обновляет профиль (INSERT OR REPLACE сохраняет created_at при апдейте)
 function saveUser(obj) {
   const stmt = db.prepare(`
-    INSERT INTO users (user_id, name, goal_year, priority, reminder_time, onboarded)
-    VALUES (@user_id, @name, @goal_year, @priority, @reminder_time, @onboarded)
+    INSERT INTO users (user_id, name, goal_year, priority, reminder_time, onboarded, last_tomorrow_plan)
+    VALUES (@user_id, @name, @goal_year, @priority, @reminder_time, @onboarded, @last_tomorrow_plan)
     ON CONFLICT(user_id) DO UPDATE SET
-      name          = excluded.name,
-      goal_year     = excluded.goal_year,
-      priority      = excluded.priority,
-      reminder_time = excluded.reminder_time,
-      onboarded     = excluded.onboarded
+      name              = excluded.name,
+      goal_year         = excluded.goal_year,
+      priority          = excluded.priority,
+      reminder_time     = excluded.reminder_time,
+      onboarded         = excluded.onboarded,
+      last_tomorrow_plan = excluded.last_tomorrow_plan
   `);
   return stmt.run(obj);
 }
@@ -144,4 +177,5 @@ module.exports = {
   saveCheckin, getAll, getLastNDays, getStreak,
   getUser, saveUser, isOnboarded, getAllUsers,
   setGoalProgress, getGoalProgressStats,
+  saveReflection, getLastReflection,
 };
