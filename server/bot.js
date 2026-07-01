@@ -66,6 +66,13 @@ function getProfileKeyboard() {
   return Markup.keyboard(['Изменить цель', 'Изменить имя', 'Изменить время']).resize();
 }
 
+function getMainKeyboard() {
+  return Markup.keyboard([
+    ['📝 Рефлексия', '💪 Здоровье'],
+    ['📊 Анализ', '💬 Поговорить'],
+  ]).resize();
+}
+
 async function showProfile(ctx, chatId) {
   const user = getUser(String(chatId));
 
@@ -82,7 +89,8 @@ async function showProfile(ctx, chatId) {
     `Напоминальник: ${user.reminder_time || '21:00'}`,
   ].join('\n');
 
-  await ctx.reply(profileText, getProfileKeyboard());
+  await ctx.reply(profileText);
+  await ctx.reply('Главное меню:', getMainKeyboard());
 }
 
 async function handleProfileEdit(ctx, chatId, session) {
@@ -148,8 +156,9 @@ bot.command('start', async (ctx) => {
     const user = getUser(String(chatId));
     await ctx.reply(
       `Привет, ${user.name}! Рад снова видеть тебя. 👋\n\n` +
-      `Напиши /checkin для чекина или просто напиши что думаешь.`
+      `Выбирай кнопку в меню: 💪 Здоровье для чек-ина, 📝 Рефлексия или просто пиши.`
     );
+    await ctx.reply('Главное меню:', getMainKeyboard());
     return;
   }
 
@@ -200,6 +209,48 @@ bot.on('text', async (ctx) => {
   if (text.startsWith('/')) return;
 
   const session = getSession(chatId);
+
+  // Главное меню кнопок (обрабатываем первыми)
+  if (text === '📝 Рефлексия') {
+    session.type = 'reflection';
+    session.step = 0;
+    session.data = { user_id: String(chatId) };
+    await ctx.reply('Давай рефлексировать. Расскажи в двух-трёх предложениях, как прошёл твой день.');
+    return;
+  }
+
+  if (text === '💪 Здоровье') {
+    if (!isOnboarded(String(chatId))) {
+      session.type = 'onboarding';
+      session.step = 0;
+      session.data = { user_id: String(chatId) };
+      await ctx.reply('Сначала познакомимся! 👋');
+      await askOnboardingStep(ctx, ONBOARDING_STEPS[0]);
+      return;
+    }
+
+    session.type = 'checkin';
+    session.step = 0;
+    session.data = { user_id: String(chatId), date: new Date().toISOString().slice(0, 10) };
+    session.history = [];
+    await ctx.reply(CHECKIN_STEPS[0].question);
+    return;
+  }
+
+  if (text === '📊 Анализ') {
+    await ctx.reply('Неделю или месяц?', Markup.inlineKeyboard([
+      Markup.button.callback('Неделя', 'ANALYZE_7'),
+      Markup.button.callback('Месяц', 'ANALYZE_30'),
+    ]));
+    return;
+  }
+
+  if (text === '💬 Поговорить') {
+    // Остаёмся в свободном чате — просто спрашиваем и ждём следующего сообщения
+    session.type = null;
+    await ctx.reply('Слушаю. Что на уме?');
+    return;
+  }
 
   if (session.type === 'profile_edit') {
     await handleProfileEdit(ctx, chatId, session);
@@ -268,7 +319,7 @@ async function handleOnboarding(ctx, chatId, session) {
     `🎯 Цель: ${profile.goal_year}\n` +
     `⚡ Приоритет: ${profile.priority}\n` +
     `🔔 Напоминание: ${profile.reminder_time}\n\n` +
-    `Готово! Напиши /checkin чтобы начать первый чек-ин.\nИли просто пиши — я всегда здесь.`,
+    `Готово! Нажми кнопку 💪 Здоровье в меню, чтобы сделать чек-ин.\nИли просто пиши — я всегда здесь.`,
     Markup.removeKeyboard()
   );
 }
@@ -397,3 +448,44 @@ console.log('🤖 Life OS бот запущен');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// Обработчики inline-кнопок для анализа
+bot.action('ANALYZE_7', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const chatId = ctx.chat.id;
+    await ctx.reply('Собираю данные за неделю...');
+    const days = getLastNDays(String(chatId), 7);
+    const user = getUser(String(chatId));
+    const reply = await chatReply({
+      message: 'Сделай аналитический дайджест по этим данным за последние 7 дней.',
+      mode: 'ANALYST',
+      user,
+      recentCheckins: days,
+    });
+    await ctx.reply(reply);
+  } catch (e) {
+    console.error('ANALYZE_7 error:', e);
+    await ctx.reply('Не удалось собрать анализ. Попробуй позже.');
+  }
+});
+
+bot.action('ANALYZE_30', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const chatId = ctx.chat.id;
+    await ctx.reply('Собираю данные за месяц...');
+    const days = getLastNDays(String(chatId), 30);
+    const user = getUser(String(chatId));
+    const reply = await chatReply({
+      message: 'Сделай аналитический дайджест по этим данным за последние 30 дней.',
+      mode: 'ANALYST',
+      user,
+      recentCheckins: days,
+    });
+    await ctx.reply(reply);
+  } catch (e) {
+    console.error('ANALYZE_30 error:', e);
+    await ctx.reply('Не удалось собрать анализ. Попробуй позже.');
+  }
+});
