@@ -3,7 +3,7 @@ const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
 const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection } = require('./db');
 const { coachReply, chatReply, analyzeGoalProgress } = require('./coach');
-const { detectMode, REFLECTION_QUESTIONS, getPrompt } = require('./prompts');
+const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -80,10 +80,10 @@ const REFLECTION_CONFIRMATIONS = ['Понял.', 'Ясно.', 'Хорошо.', '
 function getReflectionQuestion(stepIndex, user) {
   if (stepIndex === 0) {
     const previousPlan = user?.last_tomorrow_plan;
-    if (previousPlan) {
+    if (previousPlan && String(previousPlan).trim()) {
       return `Что сделал из вчерашних планов — «${previousPlan}»?`;
     }
-    return 'Как прошло начало дня?';
+    return 'Как прошло начало дня сегодня?';
   }
 
   return REFLECTION_QUESTIONS[stepIndex];
@@ -111,13 +111,12 @@ async function startReflectionFlow(ctx, chatId, session) {
 
 async function summarizeReflection(answers, user) {
   const prompt = [
-    'Сделай короткий итог рефлексии по сферам жизни: работа, здоровье, отношения, внутреннее состояние.',
-    'Отвечай коротко, 3-4 предложения, без списков из 10 пунктов.',
+    REFLECTION_SUMMARY_PROMPT,
     'Ответы пользователя:',
     ...answers.map((answer, index) => `${index + 1}. ${answer}`),
   ].join('\n');
 
-  const system = `${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\nТы делаешь итог дня по сферам жизни: работа, здоровье, отношения, внутреннее состояние. Отвечай коротко и по делу.`;
+  const system = `${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\n${REFLECTION_SUMMARY_PROMPT}`;
 
   try {
     const response = await anthropicClient.messages.create({
