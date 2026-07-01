@@ -56,6 +56,79 @@ async function askOnboardingStep(ctx, step) {
   }
 }
 
+const PROFILE_EDIT_FIELDS = {
+  'Изменить цель': { field: 'goal_year', question: '🎯 Введи новую цель на следующие 12 месяцев:' },
+  'Изменить имя': { field: 'name', question: '👤 Какое имя сохранить?' },
+  'Изменить время': { field: 'reminder_time', question: '🔔 Введи новое время напоминания в формате ЧЧ:ММ (например, 21:00):' },
+};
+
+function getProfileKeyboard() {
+  return Markup.keyboard(['Изменить цель', 'Изменить имя', 'Изменить время']).resize();
+}
+
+async function showProfile(ctx, chatId) {
+  const user = getUser(String(chatId));
+
+  if (!user || user.onboarded !== 1) {
+    await ctx.reply('Сначала пройди /start, чтобы создать профиль.');
+    return;
+  }
+
+  const profileText = [
+    'Твой профиль:',
+    `Имя: ${user.name || '—'}`,
+    `Цель: ${user.goal_year || '—'}`,
+    `Приоритет: ${user.priority || '—'}`,
+    `Напоминальник: ${user.reminder_time || '21:00'}`,
+  ].join('\n');
+
+  await ctx.reply(profileText, getProfileKeyboard());
+}
+
+async function handleProfileEdit(ctx, chatId, session) {
+  const field = session.editField;
+  const answer = ctx.message.text.trim();
+  const user = getUser(String(chatId));
+
+  if (!user || user.onboarded !== 1) {
+    session.type = null;
+    session.editField = null;
+    session.data = {};
+    await ctx.reply('Сначала пройди /start, чтобы создать профиль.');
+    return;
+  }
+
+  if (field === 'reminder_time' && !/^\d{1,2}:\d{2}$/.test(answer)) {
+    await ctx.reply('Введи время в формате ЧЧ:ММ, например 21:00');
+    return;
+  }
+
+  if ((field === 'goal_year' || field === 'name') && !answer) {
+    await ctx.reply('Поле не может быть пустым. Попробуй ещё раз.');
+    return;
+  }
+
+  const updatedProfile = {
+    user_id: String(chatId),
+    name: user.name,
+    goal_year: user.goal_year,
+    priority: user.priority,
+    reminder_time: user.reminder_time,
+    onboarded: user.onboarded,
+  };
+
+  updatedProfile[field] = answer;
+  saveUser(updatedProfile);
+
+  session.type = null;
+  session.editField = null;
+  session.data = {};
+
+  const fieldLabel = field === 'goal_year' ? 'цель' : field === 'name' ? 'имя' : 'время';
+  await ctx.reply(`✅ ${fieldLabel.charAt(0).toUpperCase() + fieldLabel.slice(1)} обновлено.`, Markup.removeKeyboard());
+  await showProfile(ctx, chatId);
+}
+
 // ─── Чек-ин ──────────────────────────────────────────────────────────────────
 
 const CHECKIN_STEPS = [
@@ -85,6 +158,12 @@ bot.command('start', async (ctx) => {
   session.step = 0;
   session.data = { user_id: String(chatId) };
   await askOnboardingStep(ctx, ONBOARDING_STEPS[0]);
+});
+
+// ─── /profile ───────────────────────────────────────────────────────────────
+
+bot.command('profile', async (ctx) => {
+  await showProfile(ctx, ctx.chat.id);
 });
 
 // ─── /checkin ────────────────────────────────────────────────────────────────
@@ -121,6 +200,20 @@ bot.on('text', async (ctx) => {
   if (text.startsWith('/')) return;
 
   const session = getSession(chatId);
+
+  if (session.type === 'profile_edit') {
+    await handleProfileEdit(ctx, chatId, session);
+    return;
+  }
+
+  if (text === 'Изменить цель' || text === 'Изменить имя' || text === 'Изменить время') {
+    const config = PROFILE_EDIT_FIELDS[text];
+    session.type = 'profile_edit';
+    session.editField = config.field;
+    session.data = {};
+    await ctx.reply(config.question, Markup.removeKeyboard());
+    return;
+  }
 
   if (session.type === 'onboarding') {
     await handleOnboarding(ctx, chatId, session);
