@@ -12,6 +12,8 @@ interface HeroMockData {
   chart: string
 }
 
+const TG_LINK = 'https://t.me/CoreOS_ai_bot'
+
 interface HeroProps {
   badge: string
   title1: string
@@ -19,10 +21,11 @@ interface HeroProps {
   subtitle: string
   cta1: string
   cta2: string
+  ctaTg: string
   mock: HeroMockData
 }
 
-export default function Hero({ badge, title1, title2, subtitle, cta1, cta2, mock }: HeroProps) {
+export default function Hero({ badge, title1, title2, subtitle, cta1, cta2, ctaTg, mock }: HeroProps) {
   return (
     <section className={s.section}>
       <div className={s.blob1} />
@@ -44,6 +47,14 @@ export default function Hero({ badge, title1, title2, subtitle, cta1, cta2, mock
           </p>
 
           <div className={s.ctas} style={{ animationDelay: '0.24s' }}>
+            <a
+              href={TG_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={s.ctaTg}
+            >
+              {ctaTg}
+            </a>
             <a href="#preview" className={s.ctaPrimary}>{cta1}</a>
             <a
               href="https://github.com"

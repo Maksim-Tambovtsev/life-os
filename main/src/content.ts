@@ -19,6 +19,7 @@ export const content = {
         'Два вопроса в день — и ты видишь, как сон, энергия и настроение связаны между собой. AI-коуч анализирует твои паттерны и даёт персональные рекомендации.',
       cta1: 'Смотреть превью',
       cta2: 'Открыть GitHub',
+      ctaTg: 'Начать бесплатно',
     },
     features: {
       kicker: 'возможности',
@@ -94,15 +95,14 @@ export const content = {
       title: 'Технологии',
       sub: 'Надёжный стек для production-продукта',
     },
+    testimonial: {
+      quote: 'За две недели я впервые увидел связь между сном и своей продуктивностью. Бот не просто записывает — он думает вместе со мной.',
+      author: 'Максим',
+      role: 'разработчик',
+    },
     footer: {
-      title: 'Собери это сам',
-      desc: 'Весь код в открытом доступе. Форкни, запусти, адаптируй под себя.',
-      commands: [
-        'git clone https://github.com/user/life-os',
-        'cd life-os && npm install',
-        'npm run dev',
-      ],
-      github: 'Открыть GitHub',
+      tgLabel: 'Начать → t.me/CoreOS_ai_bot',
+      tgLink: 'https://t.me/CoreOS_ai_bot',
       copy: '© 2025 Life OS',
     },
     heroMock: {
@@ -162,6 +162,7 @@ export const content = {
         'Two questions a day — and you see how sleep, energy and mood connect. The AI coach analyses your patterns and gives personalised recommendations.',
       cta1: 'See preview',
       cta2: 'Open GitHub',
+      ctaTg: 'Start free',
     },
     features: {
       kicker: 'features',
@@ -237,15 +238,14 @@ export const content = {
       title: 'Technologies',
       sub: 'Reliable stack for a production product',
     },
+    testimonial: {
+      quote: 'In two weeks I saw for the first time how sleep and my productivity are connected. The bot doesn\'t just record — it thinks alongside me.',
+      author: 'Maksim',
+      role: 'developer',
+    },
     footer: {
-      title: 'Build it yourself',
-      desc: 'All code is open source. Fork, run, adapt.',
-      commands: [
-        'git clone https://github.com/user/life-os',
-        'cd life-os && npm install',
-        'npm run dev',
-      ],
-      github: 'Open GitHub',
+      tgLabel: 'Start → t.me/CoreOS_ai_bot',
+      tgLink: 'https://t.me/CoreOS_ai_bot',
       copy: '© 2025 Life OS',
     },
     heroMock: {

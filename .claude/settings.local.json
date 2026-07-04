@@ -7,7 +7,8 @@
       "Bash(node --check bot.js)",
       "Bash(node --check coach.js)",
       "Bash(node --check prompts.js)",
-      "Bash(node --check cron.js)"
+      "Bash(node --check cron.js)",
+      "Bash(npx tsc *)"
     ]
   }
 }

@@ -100,6 +100,26 @@
   transform: translateY(-1px);
 }
 
+.ctaTg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: all 0.2s;
+  box-shadow: 0 0 36px var(--glow);
+}
+
+.ctaTg:hover {
+  background: var(--accent-2);
+  box-shadow: 0 0 48px var(--glow);
+  transform: translateY(-2px);
+}
+
 .ctaSecondary {
   display: inline-flex;
   align-items: center;

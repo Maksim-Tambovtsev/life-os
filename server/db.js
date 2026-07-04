@@ -137,14 +137,27 @@ function saveUser(obj) {
     INSERT INTO users (user_id, name, goal_year, priority, reminder_time, onboarded, last_tomorrow_plan)
     VALUES (@user_id, @name, @goal_year, @priority, @reminder_time, @onboarded, @last_tomorrow_plan)
     ON CONFLICT(user_id) DO UPDATE SET
-      name              = excluded.name,
-      goal_year         = excluded.goal_year,
-      priority          = excluded.priority,
-      reminder_time     = excluded.reminder_time,
-      onboarded         = excluded.onboarded,
+      name               = excluded.name,
+      goal_year          = excluded.goal_year,
+      priority           = excluded.priority,
+      reminder_time      = excluded.reminder_time,
+      onboarded          = excluded.onboarded,
       last_tomorrow_plan = excluded.last_tomorrow_plan
   `);
-  return stmt.run(obj);
+
+  // better-sqlite3 бросает RangeError если named parameter отсутствует в объекте.
+  // Гарантируем дефолты для всех полей, которые вызывающий может не передать.
+  const dataToSave = {
+    user_id:            obj.user_id,
+    name:               obj.name               ?? null,
+    goal_year:          obj.goal_year          ?? null,
+    priority:           obj.priority           ?? null,
+    reminder_time:      obj.reminder_time      ?? '21:00',
+    onboarded:          obj.onboarded          ?? 0,
+    last_tomorrow_plan: obj.last_tomorrow_plan ?? null,
+  };
+
+  return stmt.run(dataToSave);
 }
 
 function isOnboarded(userId) {
