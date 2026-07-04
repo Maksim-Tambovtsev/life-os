@@ -4,6 +4,14 @@ const { getPrompt } = require('./prompts');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Добавляет текущую дату первой строкой любого системного промпта
+function withDate(systemPrompt) {
+  const dateStr = new Date().toLocaleDateString('ru-RU', {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+  });
+  return `Сегодня: ${dateStr}.\n\n${systemPrompt}`;
+}
+
 /**
  * Ответ коуча после чек-ина (режим HEALTH).
  * @param {object}      checkin    — данные сегодняшнего чек-ина
@@ -30,7 +38,7 @@ async function coachReply(checkin, recentDays, user = null) {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 400,
-    system: getPrompt('CHECKIN', user),
+    system: withDate(getPrompt('CHECKIN', user)),
     messages: [{ role: 'user', content: userMessage }],
   });
 
@@ -61,7 +69,7 @@ async function chatReply({ message, mode, user = null, recentCheckins = [], hist
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 400,
-    system,
+    system: withDate(system),
     messages: [
       ...history,
       { role: 'user', content: message },
@@ -91,6 +99,7 @@ async function analyzeGoalProgress(reflection, goal) {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 100,
+      system: withDate('Ты — аналитик. Отвечай ТОЛЬКО валидным JSON без markdown.'),
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -108,4 +117,4 @@ async function analyzeGoalProgress(reflection, goal) {
   }
 }
 
-module.exports = { coachReply, chatReply, analyzeGoalProgress };
+module.exports = { coachReply, chatReply, analyzeGoalProgress, withDate };

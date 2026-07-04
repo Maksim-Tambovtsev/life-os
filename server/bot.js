@@ -2,7 +2,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
 const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection } = require('./db');
-const { coachReply, chatReply, analyzeGoalProgress } = require('./coach');
+const { coachReply, chatReply, analyzeGoalProgress, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
@@ -116,7 +116,7 @@ async function summarizeReflection(answers, user) {
     ...answers.map((answer, index) => `${index + 1}. ${answer}`),
   ].join('\n');
 
-  const system = `${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\n${REFLECTION_SUMMARY_PROMPT}`;
+  const system = withDate(`${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\n${REFLECTION_SUMMARY_PROMPT}`);
 
   try {
     const response = await anthropicClient.messages.create({
