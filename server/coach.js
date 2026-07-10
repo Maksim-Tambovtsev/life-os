@@ -1,6 +1,7 @@
 require('dotenv').config();
 const Anthropic = require('@anthropic-ai/sdk');
 const { getPrompt } = require('./prompts');
+const log = require('./logger').make('coach');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -112,7 +113,7 @@ async function analyzeGoalProgress(reflection, goal) {
       comment: parsed.comment || '',
     };
   } catch (e) {
-    console.error('analyzeGoalProgress error:', e.message);
+    log.error('analyzeGoalProgress error:', e.message);
     return { progress: false, comment: '' };
   }
 }

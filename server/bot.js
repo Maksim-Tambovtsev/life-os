@@ -4,6 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern } = require('./db');
 const { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
+const log = require('./logger').make('bot');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -107,7 +108,7 @@ async function summarizeReflection(reflectionText, user) {
     });
     return response.content[0].text;
   } catch (error) {
-    console.error('Reflection summary error:', error);
+    log.error('Reflection summary error:', error);
     return 'Рефлексия сохранена.';
   }
 }
@@ -493,7 +494,7 @@ async function handleCheckin(ctx, chatId, session) {
     );
 
   } catch (err) {
-    console.error('Ошибка чек-ина:', err);
+    log.error('Ошибка чек-ина:', err);
     if (err.message?.includes('anthropic') || err.status) {
       await ctx.reply('⚠️ Чек-ин сохранён, но AI-коуч временно недоступен.');
     } else {
@@ -544,13 +545,13 @@ async function handleFreeChat(ctx, chatId, text, session) {
     pushHistory(chatId, text, reply);
 
   } catch (err) {
-    console.error('Ошибка свободного диалога:', err);
+    log.error('Ошибка свободного диалога:', err);
     await ctx.reply('⚠️ AI-коуч временно недоступен. Попробуй чуть позже.');
   }
 }
 
 bot.launch();
-console.log('🤖 Life OS бот запущен');
+log.info('🤖 Life OS бот запущен');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
@@ -571,7 +572,7 @@ bot.action('ANALYZE_7', async (ctx) => {
     });
     await ctx.reply(reply);
   } catch (e) {
-    console.error('ANALYZE_7 error:', e);
+    log.error('ANALYZE_7 error:', e);
     await ctx.reply('Не удалось собрать анализ. Попробуй позже.');
   }
 });
@@ -591,7 +592,7 @@ bot.action('ANALYZE_30', async (ctx) => {
     });
     await ctx.reply(reply);
   } catch (e) {
-    console.error('ANALYZE_30 error:', e);
+    log.error('ANALYZE_30 error:', e);
     await ctx.reply('Не удалось собрать анализ. Попробуй позже.');
   }
 });
