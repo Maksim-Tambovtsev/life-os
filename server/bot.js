@@ -1,13 +1,14 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
-const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern } = require('./db');
+const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern, createLoginToken } = require('./db');
 const { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 const log = require('./logger').make('bot');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // sessions[chatId] = {
 //   type: 'onboarding' | 'checkin' | null,
@@ -254,6 +255,23 @@ bot.command('start', async (ctx) => {
 
 bot.command('profile', async (ctx) => {
   await showProfile(ctx, ctx.chat.id);
+});
+
+// ─── /login ─────────────────────────────────────────────────────────────────
+// Одноразовая ссылка для входа на сайт — обходит виджет Telegram Login,
+// который у части пользователей не доставляет код подтверждения.
+
+bot.command('login', async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  if (!isOnboarded(String(chatId))) {
+    await ctx.reply('Сначала пройди /start, чтобы создать профиль.');
+    return;
+  }
+
+  const loginToken = createLoginToken(String(chatId));
+  const url = `${FRONTEND_URL}/?login_token=${loginToken}`;
+  await ctx.reply(`🔑 Ссылка для входа на сайт (действует 5 минут):\n${url}`);
 });
 
 // ─── /checkin ────────────────────────────────────────────────────────────────

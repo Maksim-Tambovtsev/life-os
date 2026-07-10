@@ -18,6 +18,7 @@ const {
   setGoalProgress, getGoalProgressStats, getGoalStreak,
   setPendingPattern, clearPendingPattern,
   saveReflection, getLastReflection,
+  createLoginToken, consumeLoginToken,
 } = require('./db');
 
 // Дата N дней назад в формате YYYY-MM-DD, как хранится в БД
@@ -153,4 +154,32 @@ test('saveReflection + getLastReflection returns most recent by date', () => {
 
 test('getLastReflection is null when user has none', () => {
   assert.equal(getLastReflection('no-reflections'), null);
+});
+
+test('createLoginToken + consumeLoginToken round-trip returns the right user', () => {
+  const userId = 'login1';
+  const token = createLoginToken(userId);
+  assert.equal(consumeLoginToken(token), userId);
+});
+
+test('consumeLoginToken cannot be used twice', () => {
+  const token = createLoginToken('login2');
+  assert.equal(consumeLoginToken(token), 'login2');
+  assert.equal(consumeLoginToken(token), null);
+});
+
+test('consumeLoginToken rejects unknown tokens', () => {
+  assert.equal(consumeLoginToken('does-not-exist'), null);
+});
+
+test('consumeLoginToken rejects expired tokens', () => {
+  const userId = 'login3';
+  const token = createLoginToken(userId);
+  // токен создаётся со сроком в будущем — искусственно просрочим его напрямую в БД
+  const Database = require('better-sqlite3');
+  const db = new Database(tmpDbPath);
+  db.prepare("UPDATE login_tokens SET expires_at = datetime('now', '-1 minute') WHERE token = ?").run(token);
+  db.close();
+
+  assert.equal(consumeLoginToken(token), null);
 });

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { content, stackGroups, archNodes } from './content'
+import { useState, useEffect } from 'react'
+import { content } from './content'
 import type { Lang } from './content'
 import { useStats } from './hooks/useStats'
 import { useAuth } from './hooks/useAuth'
@@ -11,8 +11,6 @@ import Features from './components/Features/Features'
 import HowItWorks from './components/HowItWorks/HowItWorks'
 import Testimonial from './components/Testimonial/Testimonial'
 import Preview from './components/Preview/Preview'
-import Architecture from './components/Architecture/Architecture'
-import Stack from './components/Stack/Stack'
 import Footer from './components/Footer/Footer'
 import Dashboard from './components/Dashboard/Dashboard'
 import Reveal from './components/ui/Reveal'
@@ -24,8 +22,24 @@ export default function App() {
   const [view, setView] = useState<View>('landing')
   const c = content[lang]
 
-  const { token, loginTelegram, loginDev } = useAuth()
+  const { token, loginTelegram, loginDev, loginWithToken } = useAuth()
   const { data: statsData, loading: statsLoading, error: statsError } = useStats(token)
+  const [tokenLoginError, setTokenLoginError] = useState<string | null>(null)
+
+  // Одноразовая ссылка из бота (/login): ?login_token=... логинит сразу,
+  // без Telegram Login Widget.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const loginToken = params.get('login_token')
+    if (!loginToken) return
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('login_token')
+    window.history.replaceState({}, '', url.toString())
+
+    setView('dashboard')
+    loginWithToken(loginToken).catch((e: Error) => setTokenLoginError(e.message))
+  }, [loginWithToken])
 
   if (view === 'dashboard') {
     if (!token) {
@@ -35,6 +49,7 @@ export default function App() {
           onDevLogin={loginDev}
           onBack={() => setView('landing')}
           lang={lang}
+          externalError={tokenLoginError}
         />
       )
     }
@@ -116,24 +131,6 @@ export default function App() {
           tgTab={c.tgTab}
           aiTab={c.aiTab}
           weekData={statsData?.week}
-        />
-      </Reveal>
-
-      <Reveal>
-        <Architecture
-          kicker={c.arch.kicker}
-          title={c.arch.title}
-          sub={c.arch.sub}
-          nodes={archNodes}
-        />
-      </Reveal>
-
-      <Reveal>
-        <Stack
-          kicker={c.stack.kicker}
-          title={c.stack.title}
-          sub={c.stack.sub}
-          groups={stackGroups}
         />
       </Reveal>
 

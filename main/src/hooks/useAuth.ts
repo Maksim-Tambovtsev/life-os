@@ -70,6 +70,11 @@ export function useAuth() {
     save(res.token, res.user)
   }, [save])
 
+  const loginWithToken = useCallback(async (loginToken: string) => {
+    const res = await requestToken('/api/auth/login-token', { token: loginToken })
+    save(res.token, res.user)
+  }, [save])
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
@@ -77,5 +82,5 @@ export function useAuth() {
     setUser(null)
   }, [])
 
-  return { token, user, loginTelegram, loginDev, logout }
+  return { token, user, loginTelegram, loginDev, loginWithToken, logout }
 }

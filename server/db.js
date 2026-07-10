@@ -1,5 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const crypto = require('crypto');
 
 const dbPath = process.env.DB_PATH || './checkins.db';
 const db = new Database(dbPath);
@@ -45,6 +46,16 @@ db.exec(`
      created_at TEXT DEFAULT (datetime('now'))
    )
  `);
+
+// Таблица одноразовых токенов для входа на сайт через бота (/login)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS login_tokens (
+    token      TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER DEFAULT 0
+  )
+`);
 
 // Добавляем goal_progress в существующую таблицу, если колонки ещё нет
 // (для пользователей, у которых БД уже создана без этого поля)
@@ -223,10 +234,34 @@ function clearPendingPattern(userId) {
   ).run(userId);
 }
 
+// ─── Login tokens (одноразовые ссылки для входа на сайт через бота) ──────────
+
+const LOGIN_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 минут
+
+function createLoginToken(userId) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const expiresAt = new Date(Date.now() + LOGIN_TOKEN_TTL_MS).toISOString();
+  db.prepare(
+    'INSERT INTO login_tokens (token, user_id, expires_at) VALUES (?, ?, ?)'
+  ).run(token, userId, expiresAt);
+  return token;
+}
+
+// Возвращает user_id и помечает токен использованным, либо null если
+// токен не найден, уже использован или истёк.
+function consumeLoginToken(token) {
+  const row = db.prepare('SELECT * FROM login_tokens WHERE token = ?').get(token);
+  if (!row || row.used || new Date(row.expires_at).getTime() < Date.now()) return null;
+
+  db.prepare('UPDATE login_tokens SET used = 1 WHERE token = ?').run(token);
+  return row.user_id;
+}
+
 module.exports = {
   saveCheckin, getAll, getLastNDays, getStreak,
   getUser, saveUser, isOnboarded, getAllUsers,
   setGoalProgress, getGoalProgressStats, getGoalStreak,
   setPendingPattern, clearPendingPattern,
   saveReflection, getLastReflection,
+  createLoginToken, consumeLoginToken,
 };

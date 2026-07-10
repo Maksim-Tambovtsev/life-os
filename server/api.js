@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { getAll, getLastNDays, getStreak, getUser, saveUser } = require('./db');
+const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken } = require('./db');
 const { verifyTelegramAuth, signToken, authMiddleware } = require('./auth');
 const log = require('./logger').make('api');
 
@@ -67,6 +67,21 @@ app.post('/api/auth/telegram', authLimiter, (req, res) => {
     token: signToken(userId),
     user: publicProfile(user),
   });
+});
+
+// Вход по одноразовой ссылке из бота (/login) — обходит Telegram Login Widget,
+// у которого часть пользователей не получает подтверждение.
+app.post('/api/auth/login-token', authLimiter, (req, res) => {
+  const loginToken = String(req.body.token || '');
+  if (!loginToken) return res.status(400).json({ error: 'token required' });
+
+  const userId = consumeLoginToken(loginToken);
+  if (!userId) return res.status(401).json({ error: 'invalid or expired token' });
+
+  const user = getUser(userId);
+  if (!user) return res.status(404).json({ error: 'user not found' });
+
+  res.json({ token: signToken(userId), user: publicProfile(user) });
 });
 
 // Dev-вход для локальной разработки (Telegram widget не работает на localhost).
