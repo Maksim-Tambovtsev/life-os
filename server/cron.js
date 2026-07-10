@@ -1,7 +1,7 @@
 require('dotenv').config();
 const cron = require('node-cron');
 const { Telegraf } = require('telegraf');
-const { getAllUsers, getLastNDays, getStreak } = require('./db');
+const { getAllUsers, getLastNDays, getStreak, getGoalStreak, setPendingPattern } = require('./db');
 const { chatReply } = require('./coach');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
@@ -30,16 +30,19 @@ async function checkPatterns(user) {
   const days = getLastNDays(user.user_id, 7);
   if (!days.length) return;
 
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Правило 1: энергия < 5 два дня подряд
-  if (days.length >= 2) {
-    const last2 = days.slice(-2);
-    if (last2.every((d) => d.energy != null && d.energy < 5)) {
+  // Правило 1: энергия снижается 3 дня подряд
+  if (days.length >= 3) {
+    const last3 = days.slice(-3);
+    const allHaveEnergy = last3.every((d) => d.energy != null);
+    const declining = allHaveEnergy &&
+      last3[0].energy > last3[1].energy && last3[1].energy > last3[2].energy;
+    if (declining) {
+      const ctx = last3.map((d) => `${d.date}: ${d.energy}/10`).join(', ');
       await send(user.user_id,
-        `📉 Замечаю что энергия падает второй день (${last2.map((d) => d.energy + '/10').join(', ')}).\n\nЧто происходит?`
+        `📉 Энергия снижается три дня подряд (${last3.map((d) => d.energy + '/10').join(' → ')}).\n\nЧто изменилось?`
       );
-      return; // одно сообщение за проверку
+      setPendingPattern(user.user_id, 'energy', ctx);
+      return;
     }
   }
 
@@ -47,9 +50,11 @@ async function checkPatterns(user) {
   if (days.length >= 3) {
     const last3 = days.slice(-3);
     if (last3.every((d) => d.sleep_hours != null && d.sleep_hours < 6)) {
+      const ctx = last3.map((d) => `${d.date}: ${d.sleep_hours}ч`).join(', ');
       await send(user.user_id,
-        `😴 Ты спишь меньше нормы 3 дня подряд (${last3.map((d) => d.sleep_hours + 'ч').join(', ')}).\n\nЭто связано с работой или что-то ещё?`
+        `😴 Три дня подряд меньше 6 часов сна (${last3.map((d) => d.sleep_hours + 'ч').join(', ')}).\n\nЭто работа, стресс или режим?`
       );
+      setPendingPattern(user.user_id, 'sleep', ctx);
       return;
     }
   }
@@ -58,14 +63,21 @@ async function checkPatterns(user) {
   if (days.length >= 4) {
     const last4 = days.slice(-4);
     if (last4.every((d) => isNoActivity(d.activity))) {
-      await send(user.user_id,
-        `🏃 4 дня без движения. Велосипед или хайкинг сегодня?`
-      );
+      await send(user.user_id, `🏃 4 дня без движения. Велосипед или хайкинг сегодня?`);
       return;
     }
   }
 
-  // Правило 4: рекорд — энергия 9-10 два дня подряд
+  // Правило 4: прогресс к цели — стрик 3/7/14 дней
+  const goalStreak = getGoalStreak(user.user_id);
+  if (goalStreak >= 3 && [3, 7, 14].includes(goalStreak)) {
+    await send(user.user_id,
+      `🎯 Стрик прогресса к цели: ${goalStreak} дней подряд.\n\n«${user.goal_year}» — движешься.`
+    );
+    return;
+  }
+
+  // Правило 5: рекорд — энергия 9-10 два дня подряд
   if (days.length >= 2) {
     const last2 = days.slice(-2);
     if (last2.every((d) => d.energy != null && d.energy >= 9)) {
@@ -76,12 +88,10 @@ async function checkPatterns(user) {
     }
   }
 
-  // Правило 5: стрик 7 / 14 / 30 дней
+  // Правило 6: стрик чек-инов 7 / 14 / 30 дней
   const streak = getStreak(user.user_id);
   if ([7, 14, 30].includes(streak)) {
-    await send(user.user_id,
-      `🔥 ${streak} дней подряд! Что помогает держаться?`
-    );
+    await send(user.user_id, `🔥 ${streak} дней подряд! Что помогает держаться?`);
     return;
   }
 }
@@ -183,14 +193,14 @@ cron.schedule('0 10 * * 0', async () => {
 
     try {
       const analysis = await chatReply({
-        message: summary,
+        message: summary + '\n\nВыдай: краткие итоги недели по паттернам сна/энергии/активности, главный инсайт, и одно фокусное действие на следующую неделю.',
         mode: 'ANALYST',
         user,
         recentCheckins: days,
         history: [],
       });
 
-      await send(user.user_id, `📊 Дайджест недели:\n\n${summary}\n\n🤖 Анализ:\n${analysis}`);
+      await send(user.user_id, `📊 Дайджест недели:\n\n${summary}\n\n${analysis}`);
     } catch (e) {
       console.error('cron: ошибка дайджеста:', e.message);
       await send(user.user_id, `📊 Дайджест недели:\n\n${summary}`);

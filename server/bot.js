@@ -1,8 +1,8 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
-const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection } = require('./db');
-const { coachReply, chatReply, analyzeGoalProgress, withDate } = require('./coach');
+const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern } = require('./db');
+const { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
@@ -510,13 +510,28 @@ async function handleFreeChat(ctx, chatId, text, session) {
     return;
   }
 
-  const mode = detectMode(text);
   const user = getUser(String(chatId));
   const recentCheckins = getLastNDays(String(chatId), 7);
 
   try {
-    await ctx.sendChatAction('typing'); // показывает "печатает..."
+    await ctx.sendChatAction('typing');
 
+    // Если бот ждёт ответ на вопрос о паттерне — даём адресный совет
+    if (user?.pending_pattern) {
+      clearPendingPattern(String(chatId));
+      const reply = await getPatternAdvice(
+        user.pending_pattern,
+        user.pending_pattern_ctx || '',
+        text,
+        user,
+        recentCheckins
+      );
+      await ctx.reply(reply);
+      pushHistory(chatId, text, reply);
+      return;
+    }
+
+    const mode = detectMode(text);
     const reply = await chatReply({
       message: text,
       mode,

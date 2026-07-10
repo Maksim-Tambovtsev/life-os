@@ -117,4 +117,29 @@ async function analyzeGoalProgress(reflection, goal) {
   }
 }
 
-module.exports = { coachReply, chatReply, analyzeGoalProgress, withDate };
+/**
+ * Даёт адресный совет после того как пользователь ответил на вопрос о паттерне.
+ * @param {'energy'|'sleep'} pattern — тип паттерна
+ * @param {string} patternCtx       — контекст (данные за дни)
+ * @param {string} userReply        — ответ пользователя на вопрос
+ * @param {object|null} user
+ * @param {object[]} recentCheckins
+ */
+async function getPatternAdvice(pattern, patternCtx, userReply, user = null, recentCheckins = []) {
+  const contextMap = {
+    energy:
+      `Паттерн: энергия пользователя снижается три дня подряд (${patternCtx}). ` +
+      `Бот спросил что изменилось. Пользователь ответил: "${userReply}". ` +
+      `Дай один конкретный адресный совет по восстановлению энергии с учётом этой причины. Коротко.`,
+    sleep:
+      `Паттерн: пользователь спит меньше 6 часов три дня подряд (${patternCtx}). ` +
+      `Бот спросил о причине. Пользователь ответил: "${userReply}". ` +
+      `Дай один конкретный совет по улучшению сна с учётом этой причины. Коротко.`,
+  };
+
+  const message = contextMap[pattern] || userReply;
+
+  return chatReply({ message, mode: 'HEALTH', user, recentCheckins, history: [] });
+}
+
+module.exports = { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate };

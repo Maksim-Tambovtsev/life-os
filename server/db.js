@@ -56,6 +56,13 @@ try {
   db.exec('ALTER TABLE users ADD COLUMN last_tomorrow_plan TEXT');
 } catch (_) { /* колонка уже существует — ок */ }
 
+try {
+  db.exec('ALTER TABLE users ADD COLUMN pending_pattern TEXT');
+} catch (_) {}
+try {
+  db.exec('ALTER TABLE users ADD COLUMN pending_pattern_ctx TEXT');
+} catch (_) {}
+
 // ─── Checkins ─────────────────────────────────────────────────────────────────
 
 function saveCheckin(obj) {
@@ -186,9 +193,40 @@ function getGoalProgressStats(userId, n) {
   return { total, withProgress, percentage };
 }
 
+// Стрик дней с прогрессом к цели (goal_progress = 1, подряд от сегодня)
+function getGoalStreak(userId) {
+  const rows = db.prepare(`
+    SELECT date, goal_progress FROM checkins
+    WHERE user_id = ?
+    ORDER BY date DESC
+  `).all(userId);
+
+  let streak = 0;
+  for (const row of rows) {
+    if (row.goal_progress === 1) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// ─── Pending pattern (ожидание ответа на вопрос по паттерну) ─────────────────
+
+function setPendingPattern(userId, pattern, ctx) {
+  db.prepare(
+    'UPDATE users SET pending_pattern = ?, pending_pattern_ctx = ? WHERE user_id = ?'
+  ).run(pattern, typeof ctx === 'string' ? ctx : JSON.stringify(ctx), userId);
+}
+
+function clearPendingPattern(userId) {
+  db.prepare(
+    'UPDATE users SET pending_pattern = NULL, pending_pattern_ctx = NULL WHERE user_id = ?'
+  ).run(userId);
+}
+
 module.exports = {
   saveCheckin, getAll, getLastNDays, getStreak,
   getUser, saveUser, isOnboarded, getAllUsers,
-  setGoalProgress, getGoalProgressStats,
+  setGoalProgress, getGoalProgressStats, getGoalStreak,
+  setPendingPattern, clearPendingPattern,
   saveReflection, getLastReflection,
 };
