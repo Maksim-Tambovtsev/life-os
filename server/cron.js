@@ -3,6 +3,7 @@ const cron = require('node-cron');
 const { Telegraf } = require('telegraf');
 const { getAllUsers, getLastNDays, getStreak, getGoalStreak, setPendingPattern } = require('./db');
 const { chatReply } = require('./coach');
+const log = require('./logger').make('cron');
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
@@ -20,7 +21,7 @@ async function send(userId, text) {
   try {
     await bot.telegram.sendMessage(userId, text);
   } catch (e) {
-    console.error(`cron: не удалось отправить ${userId}:`, e.message);
+    log.error(`не удалось отправить ${userId}:`, e.message);
   }
 }
 
@@ -131,7 +132,7 @@ cron.schedule('*/5 * * * *', async () => {
 // ─── 2. УТРЕННЕЕ НАПОМИНАНИЕ ЗАДАЧ (каждый день в 8:00) ─────────────────────
 
 cron.schedule('0 8 * * *', async () => {
-  console.log('cron: утренние задачи');
+  log.info('утренние задачи');
   const users = getAllUsers();
   for (const user of users) {
     if (!user.last_tomorrow_plan) continue;
@@ -144,7 +145,7 @@ cron.schedule('0 8 * * *', async () => {
 // ─── 3. АНАЛИЗ ПАТТЕРНОВ (каждый день в 9:00) ────────────────────────────────
 
 cron.schedule('0 9 * * *', async () => {
-  console.log('cron: проверка паттернов');
+  log.info('проверка паттернов');
   const users = getAllUsers();
   for (const user of users) {
     await checkPatterns(user);
@@ -154,7 +155,7 @@ cron.schedule('0 9 * * *', async () => {
 // ─── 3. ЗАПРОС ПРОГРЕССА К ЦЕЛИ (каждую пятницу в 18:00) ─────────────────────
 
 cron.schedule('0 18 * * 5', async () => {
-  console.log('cron: запрос недельного прогресса');
+  log.info('запрос недельного прогресса');
   const users = getAllUsers();
   for (const user of users) {
     await send(user.user_id,
@@ -168,7 +169,7 @@ cron.schedule('0 18 * * 5', async () => {
 // ─── 4. НЕДЕЛЬНЫЙ ДАЙДЖЕСТ (каждое воскресенье в 10:00) ──────────────────────
 
 cron.schedule('0 10 * * 0', async () => {
-  console.log('cron: недельный дайджест');
+  log.info('недельный дайджест');
   const users = getAllUsers();
 
   for (const user of users) {
@@ -202,15 +203,15 @@ cron.schedule('0 10 * * 0', async () => {
 
       await send(user.user_id, `📊 Дайджест недели:\n\n${summary}\n\n${analysis}`);
     } catch (e) {
-      console.error('cron: ошибка дайджеста:', e.message);
+      log.error('ошибка дайджеста:', e.message);
       await send(user.user_id, `📊 Дайджест недели:\n\n${summary}`);
     }
   }
 });
 
-console.log('⏰ Cron запущен:');
-console.log('  • каждые 5 мин — вечерний напоминальник');
-console.log('  • 08:00 ежедневно — утренние задачи');
-console.log('  • 09:00 ежедневно — анализ паттернов');
-console.log('  • 18:00 пятница — запрос прогресса');
-console.log('  • 10:00 воскресенье — недельный дайджест');
+log.info('⏰ Cron запущен:');
+log.info('  • каждые 5 мин — вечерний напоминальник');
+log.info('  • 08:00 ежедневно — утренние задачи');
+log.info('  • 09:00 ежедневно — анализ паттернов');
+log.info('  • 18:00 пятница — запрос прогресса');
+log.info('  • 10:00 воскресенье — недельный дайджест');

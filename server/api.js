@@ -3,9 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const { getAll, getLastNDays, getStreak, getUser, saveUser } = require('./db');
 const { verifyTelegramAuth, signToken, authMiddleware } = require('./auth');
+const log = require('./logger').make('api');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Railway работает за реверс-прокси — без этого req.ip был бы адресом прокси
+// одинаковым для всех, и rate-limit ниже бы бил по всем пользователям разом.
+app.set('trust proxy', 1);
 
 app.use(cors());
 app.use(express.json());
@@ -17,9 +22,31 @@ app.get('/api/health', (req, res) => {
 
 // ─── Авторизация ──────────────────────────────────────────────────────────────
 
+// Простой rate-limit по IP: не больше N попыток логина за окно времени.
+// Защищает /api/auth/* от подбора user_id (dev-вход) и перебора.
+function rateLimit({ windowMs, max }) {
+  const hits = new Map(); // ip -> [timestamps]
+
+  return (req, res, next) => {
+    const ip = req.ip;
+    const now = Date.now();
+    const timestamps = (hits.get(ip) || []).filter((t) => now - t < windowMs);
+
+    if (timestamps.length >= max) {
+      return res.status(429).json({ error: 'too many attempts, try later' });
+    }
+
+    timestamps.push(now);
+    hits.set(ip, timestamps);
+    next();
+  };
+}
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+
 // Вход через Telegram Login Widget. Регистрация автоматическая:
 // если пользователя с таким chat_id нет — создаём.
-app.post('/api/auth/telegram', (req, res) => {
+app.post('/api/auth/telegram', authLimiter, (req, res) => {
   const data = req.body;
 
   if (!verifyTelegramAuth(data)) {
@@ -44,7 +71,7 @@ app.post('/api/auth/telegram', (req, res) => {
 
 // Dev-вход для локальной разработки (Telegram widget не работает на localhost).
 // Включается только флагом DEV_LOGIN=1 в .env — в проде выключен.
-app.post('/api/auth/dev', (req, res) => {
+app.post('/api/auth/dev', authLimiter, (req, res) => {
   if (process.env.DEV_LOGIN !== '1') {
     return res.status(403).json({ error: 'dev login disabled' });
   }
@@ -108,8 +135,8 @@ function average(arr) {
 }
 
 app.listen(PORT, () => {
-  console.log(`🚀 API запущен на http://localhost:${PORT}`);
+  log.info(`🚀 API запущен на http://localhost:${PORT}`);
   if (process.env.DEV_LOGIN === '1') {
-    console.warn('⚠️  DEV_LOGIN=1 — dev-вход включён, не используй в проде');
+    log.warn('⚠️  DEV_LOGIN=1 — dev-вход включён, не используй в проде');
   }
 });
