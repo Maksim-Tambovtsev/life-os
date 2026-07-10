@@ -75,111 +75,82 @@ function getMainKeyboard() {
   ]).resize();
 }
 
-const REFLECTION_CONFIRMATIONS = ['Понял.', 'Ясно.', 'Хорошо.', 'Принято.', 'Ок, дальше.'];
-
-function getReflectionQuestion(stepIndex, user) {
-  if (stepIndex === 0) {
-    const previousPlan = user?.last_tomorrow_plan;
-    if (previousPlan && String(previousPlan).trim()) {
-      return `Что сделал из вчерашних планов — «${previousPlan}»?`;
-    }
-    return 'Как прошло начало дня сегодня?';
-  }
-
-  return REFLECTION_QUESTIONS[stepIndex];
-}
-
-function getReflectionConfirmation(session) {
-  let candidate = REFLECTION_CONFIRMATIONS[Math.floor(Math.random() * REFLECTION_CONFIRMATIONS.length)];
-  while (session.lastConfirmation && candidate === session.lastConfirmation) {
-    candidate = REFLECTION_CONFIRMATIONS[Math.floor(Math.random() * REFLECTION_CONFIRMATIONS.length)];
-  }
-  session.lastConfirmation = candidate;
-  return candidate;
-}
-
 async function startReflectionFlow(ctx, chatId, session) {
   const user = getUser(String(chatId));
   session.type = 'reflection';
-  session.step = 0;
-  session.reflectionStep = 0;
-  session.reflectionAnswers = [];
-  session.lastConfirmation = null;
   session.data = { user_id: String(chatId) };
-  await ctx.reply(getReflectionQuestion(0, user), Markup.removeKeyboard());
+
+  const previousPlan = user?.last_tomorrow_plan;
+
+  const questions = [...REFLECTION_QUESTIONS];
+  if (previousPlan && String(previousPlan).trim()) {
+    questions[0] = `Что сделал из вчерашних планов:\n${previousPlan}`;
+  }
+
+  const numbered = questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
+
+  await ctx.reply(
+    `Вопросы для рефлексии:\n\n${numbered}\n\nОтветь одним сообщением — по пунктам или свободным текстом, как удобно.`,
+    Markup.removeKeyboard()
+  );
 }
 
-async function summarizeReflection(answers, user) {
-  const prompt = [
-    REFLECTION_SUMMARY_PROMPT,
-    'Ответы пользователя:',
-    ...answers.map((answer, index) => `${index + 1}. ${answer}`),
-  ].join('\n');
-
+async function summarizeReflection(reflectionText, user) {
   const system = withDate(`${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\n${REFLECTION_SUMMARY_PROMPT}`);
 
   try {
     const response = await anthropicClient.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 300,
+      max_tokens: 700,
       system,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: `Рефлексия пользователя:\n\n${reflectionText}` }],
     });
     return response.content[0].text;
   } catch (error) {
     console.error('Reflection summary error:', error);
-    return 'Рефлексия сохранена. Сегодня ты уже сделал важный шаг к ясности.';
+    return 'Рефлексия сохранена.';
   }
 }
 
 async function handleReflectionFlow(ctx, chatId, session) {
   const answer = ctx.message.text.trim();
   const user = getUser(String(chatId));
-  const stepIndex = session.reflectionStep ?? 0;
 
   if (!answer) {
     await ctx.reply('Напиши хоть пару слов, чтобы продолжить.');
     return;
   }
 
-  session.reflectionAnswers[stepIndex] = answer;
-  session.reflectionStep += 1;
-
-  if (session.reflectionStep < REFLECTION_QUESTIONS.length) {
-    const confirmation = getReflectionConfirmation(session);
-    const nextQuestion = getReflectionQuestion(session.reflectionStep, user);
-    await ctx.reply(`${confirmation}\n\n${nextQuestion}`);
-    return;
-  }
+  await ctx.reply('Анализирую...');
 
   const reflectionDate = new Date().toISOString().slice(0, 10);
-  const summary = await summarizeReflection(session.reflectionAnswers, user);
+  const summary = await summarizeReflection(answer, user);
+
   saveReflection({
     user_id: String(chatId),
     date: reflectionDate,
-    answers: session.reflectionAnswers,
+    answers: [answer],
     summary,
   });
 
-  const updatedUser = {
+  // Извлекаем задачи на завтра для утреннего напоминания
+  const tasksMatch = summary.match(/<b>Задачи на завтра<\/b>\n\n([\s\S]+?)(?:\n\n|$)/);
+  const tasksText = tasksMatch ? tasksMatch[1].trim() : '';
+
+  saveUser({
     user_id: String(chatId),
     name: user?.name,
     goal_year: user?.goal_year,
     priority: user?.priority,
     reminder_time: user?.reminder_time,
     onboarded: user?.onboarded ?? 1,
-    last_tomorrow_plan: session.reflectionAnswers[7] || '',
-  };
-  saveUser(updatedUser);
+    last_tomorrow_plan: tasksText,
+  });
 
   session.type = null;
-  session.step = 0;
   session.data = {};
-  session.reflectionStep = 0;
-  session.reflectionAnswers = [];
-  session.lastConfirmation = null;
 
-  await ctx.reply(`📝 Итог рефлексии сохранён.\n\n${summary}`, getMainKeyboard());
+  await ctx.replyWithHTML(`📝 Рефлексия сохранена.\n\n${summary}`, getMainKeyboard());
 }
 
 async function showProfile(ctx, chatId) {

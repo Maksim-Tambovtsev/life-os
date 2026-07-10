@@ -118,7 +118,20 @@ cron.schedule('*/5 * * * *', async () => {
   }
 });
 
-// ─── 2. АНАЛИЗ ПАТТЕРНОВ (каждый день в 9:00) ────────────────────────────────
+// ─── 2. УТРЕННЕЕ НАПОМИНАНИЕ ЗАДАЧ (каждый день в 8:00) ─────────────────────
+
+cron.schedule('0 8 * * *', async () => {
+  console.log('cron: утренние задачи');
+  const users = getAllUsers();
+  for (const user of users) {
+    if (!user.last_tomorrow_plan) continue;
+    await send(user.user_id,
+      `☀️ Доброе утро, ${user.name}!\n\nВчера ты планировал:\n${user.last_tomorrow_plan}`
+    );
+  }
+});
+
+// ─── 3. АНАЛИЗ ПАТТЕРНОВ (каждый день в 9:00) ────────────────────────────────
 
 cron.schedule('0 9 * * *', async () => {
   console.log('cron: проверка паттернов');
@@ -187,6 +200,7 @@ cron.schedule('0 10 * * 0', async () => {
 
 console.log('⏰ Cron запущен:');
 console.log('  • каждые 5 мин — вечерний напоминальник');
+console.log('  • 08:00 ежедневно — утренние задачи');
 console.log('  • 09:00 ежедневно — анализ паттернов');
 console.log('  • 18:00 пятница — запрос прогресса');
 console.log('  • 10:00 воскресенье — недельный дайджест');
