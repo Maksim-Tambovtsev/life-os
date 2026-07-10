@@ -22,7 +22,7 @@ const LABELS = {
     noData: 'Данных пока нет. Пройди первый /checkin в Telegram, потом обнови страницу.',
     loading: 'Загрузка данных…',
     errorPrefix: 'Не удалось загрузить данные: ',
-    greeting: 'Привет, Максим 👋',
+    greeting: 'Привет',
   },
   en: {
     back: '← Landing',
@@ -39,7 +39,7 @@ const LABELS = {
     noData: 'No data yet. Complete your first /checkin in Telegram, then refresh.',
     loading: 'Loading data…',
     errorPrefix: 'Failed to load data: ',
-    greeting: 'Hey, Maksym 👋',
+    greeting: 'Hey',
   },
 }
 
@@ -49,6 +49,7 @@ interface DashboardProps {
   error: string | null
   onBack: () => void
   lang: Lang
+  name: string | null
 }
 
 // Форматируем дату YYYY-MM-DD → короткий вид (06/28)
@@ -69,7 +70,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export default function Dashboard({ data, loading, error, onBack, lang }: DashboardProps) {
+export default function Dashboard({ data, loading, error, onBack, lang, name }: DashboardProps) {
   const t = LABELS[lang]
   const today = new Date().toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
@@ -86,7 +87,7 @@ export default function Dashboard({ data, loading, error, onBack, lang }: Dashbo
       </div>
 
       <div className={s.inner}>
-        <h1 className={s.title}>{t.greeting}</h1>
+        <h1 className={s.title}>{t.greeting}{name ? `, ${name}` : ''} 👋</h1>
 
         {/* Состояние загрузки */}
         {loading && <p className={s.status}>{t.loading}</p>}

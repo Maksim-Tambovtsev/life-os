@@ -22,7 +22,7 @@ export default function App() {
   const [view, setView] = useState<View>('landing')
   const c = content[lang]
 
-  const { token, loginTelegram, loginDev, loginWithToken } = useAuth()
+  const { token, user, loginTelegram, loginDev, loginWithToken } = useAuth()
   const { data: statsData, loading: statsLoading, error: statsError } = useStats(token)
   const [tokenLoginError, setTokenLoginError] = useState<string | null>(null)
 
@@ -60,6 +60,7 @@ export default function App() {
         error={statsError}
         onBack={() => setView('landing')}
         lang={lang}
+        name={user?.name ?? null}
       />
     )
   }
