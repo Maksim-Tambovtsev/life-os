@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './useAuth'
 
 export interface DayData {
   date: string
@@ -14,13 +15,24 @@ export interface StatsData {
   month: DayData[]
 }
 
-export function useStats() {
+export function useStats(token: string | null) {
   const [data, setData] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/stats')
+    if (!token) {
+      setData(null)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    fetch(`${API_URL}/api/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -28,7 +40,7 @@ export function useStats() {
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [token])
 
   return { data, loading, error }
 }

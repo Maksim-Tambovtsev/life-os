@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { content, stackGroups, archNodes } from './content'
 import type { Lang } from './content'
 import { useStats } from './hooks/useStats'
+import { useAuth } from './hooks/useAuth'
+import LoginScreen from './components/Auth/LoginScreen'
 import Navbar from './components/Navbar/Navbar'
 import Hero from './components/Hero/Hero'
 import Intro from './components/Intro/Intro'
@@ -22,9 +24,20 @@ export default function App() {
   const [view, setView] = useState<View>('landing')
   const c = content[lang]
 
-  const { data: statsData, loading: statsLoading, error: statsError } = useStats()
+  const { token, loginTelegram, loginDev } = useAuth()
+  const { data: statsData, loading: statsLoading, error: statsError } = useStats(token)
 
   if (view === 'dashboard') {
+    if (!token) {
+      return (
+        <LoginScreen
+          onTelegramLogin={loginTelegram}
+          onDevLogin={loginDev}
+          onBack={() => setView('landing')}
+          lang={lang}
+        />
+      )
+    }
     return (
       <Dashboard
         data={statsData}
