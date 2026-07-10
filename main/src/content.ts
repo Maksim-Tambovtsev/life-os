@@ -6,8 +6,6 @@ export const content = {
       links: [
         { label: 'Возможности', href: '#features' },
         { label: 'Как работает', href: '#how' },
-        { label: 'Архитектура', href: '#arch' },
-        { label: 'Стек', href: '#stack' },
       ],
       github: 'GitHub',
     },
@@ -85,16 +83,6 @@ export const content = {
         { key: 'ai', label: 'AI-коуч' },
       ],
     },
-    arch: {
-      kicker: 'архитектура',
-      title: 'Под капотом',
-      sub: 'Поток данных от пользователя до AI и обратно',
-    },
-    stack: {
-      kicker: 'стек',
-      title: 'Технологии',
-      sub: 'Надёжный стек для production-продукта',
-    },
     testimonial: {
       quote: 'За две недели я впервые увидел связь между сном и своей продуктивностью. Бот не просто записывает — он думает вместе со мной.',
       author: 'Максим',
@@ -149,8 +137,6 @@ export const content = {
       links: [
         { label: 'Features', href: '#features' },
         { label: 'How it works', href: '#how' },
-        { label: 'Architecture', href: '#arch' },
-        { label: 'Stack', href: '#stack' },
       ],
       github: 'GitHub',
     },
@@ -228,16 +214,6 @@ export const content = {
         { key: 'ai', label: 'AI coach' },
       ],
     },
-    arch: {
-      kicker: 'architecture',
-      title: 'Under the hood',
-      sub: 'Data flow from user to AI and back',
-    },
-    stack: {
-      kicker: 'stack',
-      title: 'Technologies',
-      sub: 'Reliable stack for a production product',
-    },
     testimonial: {
       quote: 'In two weeks I saw for the first time how sleep and my productivity are connected. The bot doesn\'t just record — it thinks alongside me.',
       author: 'Maksim',
@@ -289,29 +265,3 @@ export const content = {
   },
 };
 
-export const stackGroups = [
-  {
-    name: 'Frontend',
-    items: ['React 18', 'TypeScript', 'Vite', 'CSS Modules'],
-  },
-  {
-    name: 'Backend',
-    items: ['Node.js', 'Express', 'SQLite', 'Anthropic API'],
-  },
-  {
-    name: 'Деплой',
-    items: ['Vercel', 'GitHub Actions', 'Docker'],
-  },
-  {
-    name: 'Инструменты',
-    items: ['VS Code', 'Git', 'Figma', 'Postman'],
-  },
-];
-
-export const archNodes = [
-  { id: 'tg', label: 'Telegram', sub: 'Пользователь' },
-  { id: 'react', label: 'React', sub: 'Дашборд' },
-  { id: 'api', label: 'Express API', sub: 'Бэкенд' },
-  { id: 'ai', label: 'Anthropic', sub: 'AI-коуч' },
-  { id: 'db', label: 'SQLite / JSON', sub: 'Хранилище' },
-];
