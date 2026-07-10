@@ -6,7 +6,7 @@
     "bot": "node bot.js",
     "api": "node api.js",
     "cron": "node cron.js",
-    "start": "concurrently \"node bot.js\" \"node api.js\" \"node cron.js\" \"npm run dev --prefix ../main\""
+    "start": "concurrently \"node bot.js\" \"node api.js\" \"node cron.js\""
   },
   "keywords": [],
   "author": "",
