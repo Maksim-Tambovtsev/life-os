@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { content } from './content'
 import type { Lang } from './content'
 import { useStats } from './hooks/useStats'
@@ -22,8 +22,24 @@ export default function App() {
   const [view, setView] = useState<View>('landing')
   const c = content[lang]
 
-  const { token, loginTelegram, loginDev } = useAuth()
+  const { token, loginTelegram, loginDev, loginWithToken } = useAuth()
   const { data: statsData, loading: statsLoading, error: statsError } = useStats(token)
+  const [tokenLoginError, setTokenLoginError] = useState<string | null>(null)
+
+  // Одноразовая ссылка из бота (/login): ?login_token=... логинит сразу,
+  // без Telegram Login Widget.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const loginToken = params.get('login_token')
+    if (!loginToken) return
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('login_token')
+    window.history.replaceState({}, '', url.toString())
+
+    setView('dashboard')
+    loginWithToken(loginToken).catch((e: Error) => setTokenLoginError(e.message))
+  }, [loginWithToken])
 
   if (view === 'dashboard') {
     if (!token) {
@@ -33,6 +49,7 @@ export default function App() {
           onDevLogin={loginDev}
           onBack={() => setView('landing')}
           lang={lang}
+          externalError={tokenLoginError}
         />
       )
     }
