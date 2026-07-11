@@ -132,10 +132,16 @@ function getLastReflection(userId) {
 }
 
 function getLastNDays(userId, n) {
+  // Один ряд на день: при повторном чек-ине за день берём последний,
+  // иначе дубликаты ломают графики и искажают средние.
   return db.prepare(`
     SELECT * FROM checkins
-    WHERE user_id = ?
-      AND date >= date('now', '-' || ? || ' days')
+    WHERE id IN (
+      SELECT MAX(id) FROM checkins
+      WHERE user_id = ?
+        AND date >= date('now', '-' || ? || ' days')
+      GROUP BY date
+    )
     ORDER BY date ASC
   `).all(userId, n - 1);
 }

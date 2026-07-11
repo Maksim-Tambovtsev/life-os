@@ -7,7 +7,6 @@ export const content = {
         { label: 'Возможности', href: '#features' },
         { label: 'Как работает', href: '#how' },
       ],
-      github: 'GitHub',
     },
     hero: {
       badge: 'Твой AI-коуч в Telegram',
@@ -16,7 +15,6 @@ export const content = {
       subtitle:
         'Два вопроса в день — и ты видишь, как сон, энергия и настроение связаны между собой. AI-коуч анализирует твои паттерны и даёт персональные рекомендации.',
       cta1: 'Смотреть превью',
-      cta2: 'Открыть GitHub',
       ctaTg: 'Начать бесплатно',
     },
     features: {
@@ -101,6 +99,7 @@ export const content = {
       energyVal: '82%',
       sleepVal: '7.5ч',
       chart: 'Неделя в графике',
+      dayLabels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
     },
     dashTab: {
       title: 'Дашборд',
@@ -113,8 +112,10 @@ export const content = {
         { label: 'Стрик', value: '7 дней', color: '#5BA7FF' },
       ],
       chartLabel: 'Энергия за неделю',
+      dayLabels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
     },
     tgTab: {
+      inputPlaceholder: 'Написать сообщение...',
       messages: [
         { from: 'bot', text: '🌅 Доброе утро! Готов к чекину?' },
         { from: 'user', text: 'Да, поехали' },
@@ -130,6 +131,8 @@ export const content = {
       response:
         'За последние 7 дней средняя энергия — 7.4/10. Пик в среду (9/10), спад в пятницу (5/10). Паттерн: когда сон < 7ч, энергия падает на 30%. Рекомендация: поставь напоминание на 23:00 для отхода ко сну.',
       label: 'AI-коуч',
+      youLabel: 'Вы',
+      insights: ['Средняя энергия: 7.4/10', 'Сон < 7ч → энергия -30%', 'Лучший день: среда'],
     },
   },
   en: {
@@ -138,7 +141,6 @@ export const content = {
         { label: 'Features', href: '#features' },
         { label: 'How it works', href: '#how' },
       ],
-      github: 'GitHub',
     },
     hero: {
       badge: 'Your AI coach in Telegram',
@@ -147,7 +149,6 @@ export const content = {
       subtitle:
         'Two questions a day — and you see how sleep, energy and mood connect. The AI coach analyses your patterns and gives personalised recommendations.',
       cta1: 'See preview',
-      cta2: 'Open GitHub',
       ctaTg: 'Start free',
     },
     features: {
@@ -232,6 +233,7 @@ export const content = {
       energyVal: '82%',
       sleepVal: '7.5h',
       chart: 'Week at a glance',
+      dayLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     },
     dashTab: {
       title: 'Dashboard',
@@ -244,8 +246,10 @@ export const content = {
         { label: 'Streak', value: '7 days', color: '#5BA7FF' },
       ],
       chartLabel: 'Energy this week',
+      dayLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     },
     tgTab: {
+      inputPlaceholder: 'Write a message...',
       messages: [
         { from: 'bot', text: '🌅 Good morning! Ready for check-in?' },
         { from: 'user', text: "Yes, let's go" },
@@ -261,6 +265,8 @@ export const content = {
       response:
         'Over the last 7 days, average energy was 7.4/10. Peak on Wednesday (9/10), dip on Friday (5/10). Pattern: when sleep < 7h, energy drops by 30%. Recommendation: set a reminder at 23:00 for bedtime.',
       label: 'AI coach',
+      youLabel: 'You',
+      insights: ['Avg energy: 7.4/10', 'Sleep < 7h → energy -30%', 'Best day: Wednesday'],
     },
   },
 };

@@ -10,6 +10,7 @@ interface HeroMockData {
   energyVal: string
   sleepVal: string
   chart: string
+  dayLabels: string[]
 }
 
 const TG_LINK = 'https://t.me/CoreOS_ai_bot'
@@ -20,12 +21,11 @@ interface HeroProps {
   title2: string
   subtitle: string
   cta1: string
-  cta2: string
   ctaTg: string
   mock: HeroMockData
 }
 
-export default function Hero({ badge, title1, title2, subtitle, cta1, cta2, ctaTg, mock }: HeroProps) {
+export default function Hero({ badge, title1, title2, subtitle, cta1, ctaTg, mock }: HeroProps) {
   return (
     <section className={s.section}>
       <div className={s.blob1} />
@@ -56,14 +56,6 @@ export default function Hero({ badge, title1, title2, subtitle, cta1, cta2, ctaT
               {ctaTg}
             </a>
             <a href="#preview" className={s.ctaPrimary}>{cta1}</a>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={s.ctaSecondary}
-            >
-              {cta2}
-            </a>
           </div>
         </div>
 

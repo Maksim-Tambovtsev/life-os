@@ -7,9 +7,10 @@ interface Message {
 
 interface TelegramTabProps {
   messages: Message[]
+  inputPlaceholder: string
 }
 
-export default function TelegramTab({ messages }: TelegramTabProps) {
+export default function TelegramTab({ messages, inputPlaceholder }: TelegramTabProps) {
   return (
     <div className={s.tg}>
       <div className={s.tgHeader}>
@@ -34,7 +35,7 @@ export default function TelegramTab({ messages }: TelegramTabProps) {
       </div>
 
       <div className={s.tgInput}>
-        <span>Написать сообщение...</span>
+        <span>{inputPlaceholder}</span>
         <button className={s.tgSend}>➤</button>
       </div>
     </div>
