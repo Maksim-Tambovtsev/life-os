@@ -225,3 +225,15 @@ test('weekly rating flag + save + list round-trip', () => {
   assert.equal(ratings[0].rating, 7);
   assert.equal(ratings[0].note, 'норм неделя');
 });
+
+test('getLastNDays returns one row per date — the latest checkin wins', () => {
+  const userId = 'dup1';
+  const today = daysAgo(0);
+  saveCheckin({ user_id: userId, date: today, sleep_hours: 7, wake_quality: 7, activity: 'нет', energy: 5, reflection: 'первый', goal_progress: null });
+  saveCheckin({ user_id: userId, date: today, sleep_hours: 8, wake_quality: 9, activity: 'вело', energy: 9, reflection: 'второй', goal_progress: null });
+
+  const days = getLastNDays(userId, 7);
+  assert.equal(days.length, 1);
+  assert.equal(days[0].energy, 9);
+  assert.equal(days[0].reflection, 'второй');
+});

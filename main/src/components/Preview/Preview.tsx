@@ -24,9 +24,9 @@ interface PreviewProps {
   title: string
   sub: string
   tabs: Tab[]
-  dashTab: { title: string; greeting: string; date: string; metrics: Metric[]; chartLabel: string }
-  tgTab: { messages: { from: string; text: string }[] }
-  aiTab: { prompt: string; response: string; label: string }
+  dashTab: { title: string; greeting: string; date: string; metrics: Metric[]; chartLabel: string; dayLabels: string[] }
+  tgTab: { messages: { from: string; text: string }[]; inputPlaceholder: string }
+  aiTab: { prompt: string; response: string; label: string; youLabel: string; insights: string[] }
   weekData?: DayData[]
 }
 

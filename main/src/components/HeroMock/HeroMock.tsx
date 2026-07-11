@@ -1,6 +1,7 @@
 import s from './HeroMock.module.css'
 
 interface HeroMockProps {
+  dayLabels: string[]
   greeting: string
   streak: string
   energy: string
@@ -12,7 +13,7 @@ interface HeroMockProps {
 
 const BARS = [55, 72, 60, 88, 65, 82, 90]
 
-export default function HeroMock({ greeting, streak, energy, sleep, energyVal, sleepVal, chart }: HeroMockProps) {
+export default function HeroMock({ greeting, streak, energy, sleep, energyVal, sleepVal, chart, dayLabels }: HeroMockProps) {
   return (
     <div className={s.card}>
       <div className={s.header}>
@@ -48,7 +49,7 @@ export default function HeroMock({ greeting, streak, energy, sleep, energyVal, s
           ))}
         </div>
         <div className={s.chartDays}>
-          {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
+          {dayLabels.map((d) => (
             <span key={d}>{d}</span>
           ))}
         </div>

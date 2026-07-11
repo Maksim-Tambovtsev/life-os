@@ -13,14 +13,14 @@ interface DashboardTabProps {
   date: string
   metrics: Metric[]
   chartLabel: string
+  dayLabels: string[]
   weekData?: DayData[] // реальные данные из API, если сервер запущен
 }
 
 // Запасные бары, пока нет реальных данных
 const MOCK_BARS = [60, 75, 55, 90, 65, 82, 88]
-const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
-export default function DashboardTab({ greeting, date, metrics, chartLabel, weekData }: DashboardTabProps) {
+export default function DashboardTab({ greeting, date, metrics, chartLabel, dayLabels, weekData }: DashboardTabProps) {
   // Если есть реальные данные — конвертируем energy (1-10) в проценты высоты бара
   const bars = weekData && weekData.length > 0
     ? weekData.map((d) => Math.round((d.energy / 10) * 100))
@@ -53,7 +53,7 @@ export default function DashboardTab({ greeting, date, metrics, chartLabel, week
           ))}
         </div>
         <div className={s.dashDays}>
-          {DAY_LABELS.map((d) => (
+          {dayLabels.map((d) => (
             <span key={d}>{d}</span>
           ))}
         </div>

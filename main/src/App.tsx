@@ -83,7 +83,6 @@ export default function App() {
         lang={lang}
         onLangChange={setLang}
         links={c.nav.links}
-        githubLabel={c.nav.github}
         onOpenDashboard={() => setView('dashboard')}
       />
 
@@ -94,7 +93,6 @@ export default function App() {
         title2={c.hero.title2}
         subtitle={c.hero.subtitle}
         cta1={c.hero.cta1}
-        cta2={c.hero.cta2}
         ctaTg={c.hero.ctaTg}
         mock={c.heroMock}
       />

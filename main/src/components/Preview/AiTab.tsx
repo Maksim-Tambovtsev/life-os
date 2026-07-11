@@ -4,13 +4,15 @@ interface AiTabProps {
   prompt: string
   response: string
   label: string
+  youLabel: string
+  insights: string[]
 }
 
-export default function AiTab({ prompt, response, label }: AiTabProps) {
+export default function AiTab({ prompt, response, label, youLabel, insights }: AiTabProps) {
   return (
     <div className={s.ai}>
       <div className={s.aiPrompt}>
-        <span className={s.aiUser}>Вы</span>
+        <span className={s.aiUser}>{youLabel}</span>
         <p className={s.aiPromptText}>{prompt}</p>
       </div>
 
@@ -23,18 +25,12 @@ export default function AiTab({ prompt, response, label }: AiTabProps) {
       </div>
 
       <div className={s.aiInsights}>
-        <div className={s.aiInsight}>
-          <span className={s.aiInsightIcon}>📈</span>
-          <span>Средняя энергия: 7.4/10</span>
-        </div>
-        <div className={s.aiInsight}>
-          <span className={s.aiInsightIcon}>😴</span>
-          <span>Сон &lt; 7ч → энергия -30%</span>
-        </div>
-        <div className={s.aiInsight}>
-          <span className={s.aiInsightIcon}>🎯</span>
-          <span>Лучший день: среда</span>
-        </div>
+        {insights.map((text, i) => (
+          <div key={i} className={s.aiInsight}>
+            <span className={s.aiInsightIcon}>{['📈', '😴', '🎯'][i] ?? '•'}</span>
+            <span>{text}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
