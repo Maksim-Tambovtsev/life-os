@@ -22,7 +22,15 @@ const LABELS = {
     noData: 'Данных пока нет. Пройди первый /checkin в Telegram, потом обнови страницу.',
     loading: 'Загрузка данных…',
     errorPrefix: 'Не удалось загрузить данные: ',
-    greeting: 'Привет, Максим 👋',
+    greeting: 'Привет',
+    agents: '🤖 Мои агенты',
+    normsTitle: 'Неделя — % от нормы',
+    gaugeSleep: 'Сон',
+    gaugeEnergy: 'Энергия',
+    gaugeGoal: 'Цель',
+    goalBarTitle: 'Прогресс к цели — еженедельные оценки',
+    goalBarLatest: 'Последняя оценка',
+    goalBarEmpty: 'Оценок пока нет. Бот спросит о прогрессе в пятницу вечером — ответь числом от 1 до 10.',
   },
   en: {
     back: '← Landing',
@@ -39,7 +47,15 @@ const LABELS = {
     noData: 'No data yet. Complete your first /checkin in Telegram, then refresh.',
     loading: 'Loading data…',
     errorPrefix: 'Failed to load data: ',
-    greeting: 'Hey, Maksym 👋',
+    greeting: 'Hey',
+    agents: '🤖 My agents',
+    normsTitle: 'Week — % of norm',
+    gaugeSleep: 'Sleep',
+    gaugeEnergy: 'Energy',
+    gaugeGoal: 'Goal',
+    goalBarTitle: 'Goal progress — weekly ratings',
+    goalBarLatest: 'Latest rating',
+    goalBarEmpty: 'No ratings yet. The bot asks about progress on Friday evening — reply with a number 1–10.',
   },
 }
 
@@ -48,7 +64,36 @@ interface DashboardProps {
   loading: boolean
   error: string | null
   onBack: () => void
+  onOpenAgents: () => void
   lang: Lang
+  name: string | null
+}
+
+// Круговой индикатор: value в процентах 0-100
+function Gauge({ value, label, color }: { value: number; label: string; color: string }) {
+  const clamped = Math.max(0, Math.min(100, value))
+  const r = 54
+  const circumference = 2 * Math.PI * r
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="10" />
+        <circle
+          cx="70" cy="70" r={r} fill="none"
+          stroke={color} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`}
+          transform="rotate(-90 70 70)"
+        />
+        <text x="70" y="66" textAnchor="middle" fill="var(--text, #fff)"
+          style={{ fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-head)' }}>
+          {Math.round(clamped)}%
+        </text>
+        <text x="70" y="88" textAnchor="middle" fill="var(--muted, #6B7480)" style={{ fontSize: 12 }}>
+          {label}
+        </text>
+      </svg>
+    </div>
+  )
 }
 
 // Форматируем дату YYYY-MM-DD → короткий вид (06/28)
@@ -69,11 +114,19 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export default function Dashboard({ data, loading, error, onBack, lang }: DashboardProps) {
+export default function Dashboard({ data, loading, error, onBack, onOpenAgents, lang, name }: DashboardProps) {
   const t = LABELS[lang]
   const today = new Date().toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
+
+  // Проценты от нормы: сон — от 8 часов, энергия — от 10, цель — % дней с шагом к цели
+  const sleepPct = data?.avgSleep != null ? (data.avgSleep / 8) * 100 : null
+  const energyPct = data?.avgEnergy != null ? (data.avgEnergy / 10) * 100 : null
+  const goalPct = data?.goalProgressPct ?? null
+  const latestRating = data?.weeklyRatings?.length
+    ? data.weeklyRatings[data.weeklyRatings.length - 1]
+    : null
 
   return (
     <div className={s.root}>
@@ -81,12 +134,13 @@ export default function Dashboard({ data, loading, error, onBack, lang }: Dashbo
       <div className={s.header}>
         <button className={s.backBtn} onClick={onBack}>{t.back}</button>
         <div className={s.headerRight}>
+          <button className={s.backBtn} onClick={onOpenAgents}>{t.agents}</button>
           <span className={s.date}>{today}</span>
         </div>
       </div>
 
       <div className={s.inner}>
-        <h1 className={s.title}>{t.greeting}</h1>
+        <h1 className={s.title}>{t.greeting}{name ? `, ${name}` : ''} 👋</h1>
 
         {/* Состояние загрузки */}
         {loading && <p className={s.status}>{t.loading}</p>}
@@ -126,6 +180,53 @@ export default function Dashboard({ data, loading, error, onBack, lang }: Dashbo
                 <span className={s.statLabel}>{t.avgEnergy}</span>
                 <span className={s.statIcon}>⚡</span>
               </div>
+            </div>
+
+            {/* Круговые индикаторы: % от нормы */}
+            <div className={s.chartCardWide}>
+              <p className={s.chartLabel}>{t.normsTitle}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 12 }}>
+                {sleepPct != null && <Gauge value={sleepPct} label={t.gaugeSleep} color="#29B6F6" />}
+                {energyPct != null && <Gauge value={energyPct} label={t.gaugeEnergy} color="#4D9FFF" />}
+                {goalPct != null && <Gauge value={goalPct} label={t.gaugeGoal} color="#6FE3A5" />}
+              </div>
+            </div>
+
+            {/* Полоса прогресса к цели по еженедельным оценкам */}
+            <div className={s.chartCardWide}>
+              <p className={s.chartLabel}>{t.goalBarTitle}</p>
+              {latestRating ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                      {t.goalBarLatest}: {fmtDate(latestRating.date)}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-head)', fontSize: 24, fontWeight: 700 }}>
+                      {latestRating.rating}<span style={{ fontSize: 14, color: 'var(--muted)' }}>/10</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${latestRating.rating * 10}%`, height: '100%', borderRadius: 6,
+                      background: 'linear-gradient(90deg, #4D9FFF, #6FE3A5)',
+                      transition: 'width .6s cubic-bezier(.2,.7,.2,1)',
+                    }} />
+                  </div>
+                  {data.weeklyRatings.length > 1 && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 40 }}>
+                      {data.weeklyRatings.map((r, i) => (
+                        <div key={`${r.date}-${i}`} title={`${fmtDate(r.date)}: ${r.rating}/10`} style={{
+                          flex: 1, maxWidth: 28, borderRadius: 3,
+                          height: `${r.rating * 10}%`,
+                          background: 'rgba(77,159,255,.45)',
+                        }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>{t.goalBarEmpty}</p>
+              )}
             </div>
 
             {/* Графики недели */}

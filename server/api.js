@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken } = require('./db');
+const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken, updateProfile, PROFILE_EDITABLE_FIELDS, getGoalProgressStats, getWeeklyRatings } = require('./db');
 const { verifyTelegramAuth, signToken, authMiddleware } = require('./auth');
 const log = require('./logger').make('api');
 
@@ -108,6 +108,24 @@ app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ ...publicProfile(user), streak: getStreak(req.userId) });
 });
 
+// Обновление профиля с сайта: цель и личные контексты агентов.
+// Принимает только поля из белого списка, строки до 2000 символов.
+app.put('/api/profile', authMiddleware, (req, res) => {
+  const fields = {};
+  for (const key of PROFILE_EDITABLE_FIELDS) {
+    const value = req.body[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'string') return res.status(400).json({ error: `${key} must be a string` });
+    if (value.length > 2000) return res.status(400).json({ error: `${key} too long (max 2000)` });
+    fields[key] = value.trim();
+  }
+
+  if (!Object.keys(fields).length) return res.status(400).json({ error: 'no editable fields provided' });
+
+  updateProfile(req.userId, fields);
+  res.json(publicProfile(getUser(req.userId)));
+});
+
 // Все чек-ины пользователя
 app.get('/api/checkins', authMiddleware, (req, res) => {
   res.json(getAll(req.userId));
@@ -125,7 +143,16 @@ app.get('/api/stats', authMiddleware, (req, res) => {
   const toChart = (rows) =>
     rows.map((r) => ({ date: r.date, sleep_hours: r.sleep_hours, energy: r.energy }));
 
-  res.json({ streak, avgSleep, avgEnergy, week: toChart(week), month: toChart(month) });
+  // Прогресс к цели: % дней с шагом к цели за неделю + еженедельные оценки 1-10
+  const goalWeek = getGoalProgressStats(req.userId, 7);
+  const weeklyRatings = getWeeklyRatings(req.userId, 12);
+
+  res.json({
+    streak, avgSleep, avgEnergy,
+    week: toChart(week), month: toChart(month),
+    goalProgressPct: goalWeek.percentage,
+    weeklyRatings,
+  });
 });
 
 // ─── Утилиты ─────────────────────────────────────────────────────────────────
@@ -138,6 +165,11 @@ function publicProfile(user) {
     goal_year: user.goal_year,
     priority: user.priority,
     onboarded: user.onboarded,
+    agent_ctx_health: user.agent_ctx_health,
+    agent_ctx_strategist: user.agent_ctx_strategist,
+    agent_ctx_focus: user.agent_ctx_focus,
+    agent_ctx_mentor: user.agent_ctx_mentor,
+    agent_ctx_analyst: user.agent_ctx_analyst,
   };
 }
 

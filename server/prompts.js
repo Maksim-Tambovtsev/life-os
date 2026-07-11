@@ -339,20 +339,45 @@ function detectMode(text) {
 
 // ─── Подстановка данных пользователя в промпт ────────────────────────────────
 
+// Какая колонка users хранит личный контекст пользователя для каждого агента
+const AGENT_CTX_FIELD = {
+  HEALTH: "agent_ctx_health",
+  CHECKIN: "agent_ctx_health",
+  STRATEGIST: "agent_ctx_strategist",
+  FOCUS: "agent_ctx_focus",
+  MENTOR: "agent_ctx_mentor",
+  ANALYST: "agent_ctx_analyst",
+};
+
 /**
  * Возвращает системный промпт для заданного режима с подставленными данными.
+ * Личный контекст пользователя (раздел «Мои агенты» на сайте) добавляется
+ * в конец промпта — пользователь видит только свою часть, системную не видит.
  * @param {'HEALTH'|'STRATEGIST'|'FOCUS'|'ANALYST'|'MENTOR'|'CHECKIN'} mode
- * @param {{ name?: string, goal_year?: string }} userData
+ * @param {{ name?: string, goal_year?: string, priority?: string }} userData
  * @returns {string}
  */
 function getPrompt(mode, userData = {}) {
   const agent = AGENTS[mode] || AGENTS.MENTOR;
   const name = userData.name || "Пользователь";
   const goal = userData.goal_year || "не указана";
+  const priority = userData.priority || "не указан";
+  const userCtx = userData[AGENT_CTX_FIELD[mode]] || "";
 
   // Подставляем имя и цель в BASE, затем в системный промпт агента
   const filledBase = BASE.replace("{name}", name).replace("{goal}", goal);
-  return agent.system.replace("{BASE}", filledBase);
+  let prompt = agent.system
+    .replace("{BASE}", filledBase)
+    .replace("{name}", name)
+    .replace("{goal}", goal)
+    .replace("{priority}", priority)
+    .replace("{context}", userCtx || "не указан");
+
+  if (userCtx.trim()) {
+    prompt += `\n\nЛИЧНЫЙ КОНТЕКСТ ОТ ПОЛЬЗОВАТЕЛЯ (учитывай в каждом ответе):\n${userCtx.trim()}`;
+  }
+
+  return prompt;
 }
 
 module.exports = { AGENTS, detectMode, getPrompt, REFLECTION_QUESTIONS, REFLECTION_SUMMARY_PROMPT };

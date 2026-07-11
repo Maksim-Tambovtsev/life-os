@@ -74,6 +74,30 @@ try {
   db.exec('ALTER TABLE users ADD COLUMN pending_pattern_ctx TEXT');
 } catch (_) {}
 
+// Личный контекст для каждого из пяти агентов (раздел «Мои агенты» на сайте)
+for (const col of ['agent_ctx_health', 'agent_ctx_strategist', 'agent_ctx_focus', 'agent_ctx_mentor', 'agent_ctx_analyst']) {
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
+  } catch (_) {}
+}
+
+// Ожидание еженедельной оценки прогресса к цели (пятничный вопрос из cron)
+try {
+  db.exec('ALTER TABLE users ADD COLUMN pending_weekly_rating INTEGER DEFAULT 0');
+} catch (_) {}
+
+// Еженедельные оценки прогресса к цели (1-10, из пятничного вопроса)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS weekly_goal_ratings (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    date       TEXT NOT NULL,
+    rating     INTEGER NOT NULL,
+    note       TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 // ─── Checkins ─────────────────────────────────────────────────────────────────
 
 function saveCheckin(obj) {
@@ -234,6 +258,44 @@ function clearPendingPattern(userId) {
   ).run(userId);
 }
 
+// ─── Профиль: цель и контексты агентов (редактируются с сайта) ───────────────
+
+const PROFILE_EDITABLE_FIELDS = [
+  'goal_year',
+  'agent_ctx_health', 'agent_ctx_strategist', 'agent_ctx_focus',
+  'agent_ctx_mentor', 'agent_ctx_analyst',
+];
+
+// Обновляет только переданные поля из белого списка. Возвращает true если что-то обновилось.
+function updateProfile(userId, fields) {
+  const updates = PROFILE_EDITABLE_FIELDS.filter((f) => fields[f] !== undefined);
+  if (!updates.length) return false;
+
+  const setClause = updates.map((f) => `${f} = ?`).join(', ');
+  const values = updates.map((f) => fields[f]);
+  const result = db.prepare(`UPDATE users SET ${setClause} WHERE user_id = ?`).run(...values, userId);
+  return result.changes > 0;
+}
+
+// ─── Еженедельные оценки прогресса к цели ─────────────────────────────────────
+
+function setPendingWeeklyRating(userId, value) {
+  db.prepare('UPDATE users SET pending_weekly_rating = ? WHERE user_id = ?').run(value ? 1 : 0, userId);
+}
+
+function saveWeeklyRating(userId, rating, note = '') {
+  const date = new Date().toISOString().slice(0, 10);
+  db.prepare(
+    'INSERT INTO weekly_goal_ratings (user_id, date, rating, note) VALUES (?, ?, ?, ?)'
+  ).run(userId, date, rating, note);
+}
+
+function getWeeklyRatings(userId, limit = 12) {
+  return db.prepare(
+    'SELECT date, rating, note FROM weekly_goal_ratings WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?'
+  ).all(userId, limit).reverse(); // от старых к новым — удобно для графиков
+}
+
 // ─── Login tokens (одноразовые ссылки для входа на сайт через бота) ──────────
 
 const LOGIN_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 минут
@@ -264,4 +326,6 @@ module.exports = {
   setPendingPattern, clearPendingPattern,
   saveReflection, getLastReflection,
   createLoginToken, consumeLoginToken,
+  updateProfile, PROFILE_EDITABLE_FIELDS,
+  setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,
 };

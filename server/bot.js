@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
-const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern, createLoginToken } = require('./db');
+const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern, createLoginToken, setPendingWeeklyRating, saveWeeklyRating } = require('./db');
 const { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 const log = require('./logger').make('bot');
@@ -534,6 +534,33 @@ async function handleFreeChat(ctx, chatId, text, session) {
 
   try {
     await ctx.sendChatAction('typing');
+
+    // Если бот ждёт еженедельную оценку прогресса (пятничный вопрос) —
+    // вытаскиваем число 1-10 из ответа и сохраняем для дашборда
+    if (user?.pending_weekly_rating) {
+      const ratingMatch = text.match(/\b([1-9]|10)\b/);
+      if (ratingMatch) {
+        const rating = parseInt(ratingMatch[1], 10);
+        setPendingWeeklyRating(String(chatId), false);
+        saveWeeklyRating(String(chatId), rating, text);
+
+        const reply = await chatReply({
+          message:
+            `Пользователь оценил недельный прогресс к цели на ${rating}/10 и написал: "${text}". ` +
+            `Отреагируй коротко: одно наблюдение или один вопрос.`,
+          mode: 'STRATEGIST',
+          user,
+          recentCheckins,
+          history: session.history,
+        });
+        await ctx.reply(`✅ Оценка ${rating}/10 записана — увидишь её на дашборде.\n\n${reply}`);
+        pushHistory(chatId, text, reply);
+        return;
+      }
+      // Числа в ответе нет — просим оценку ещё раз, флаг не снимаем
+      await ctx.reply('Поставь оценку числом от 1 до 10 (можно вместе с комментарием).');
+      return;
+    }
 
     // Если бот ждёт ответ на вопрос о паттерне — даём адресный совет
     if (user?.pending_pattern) {
