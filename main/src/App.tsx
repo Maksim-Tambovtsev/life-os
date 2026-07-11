@@ -94,7 +94,6 @@ export default function App() {
         subtitle={c.hero.subtitle}
         cta1={c.hero.cta1}
         ctaTg={c.hero.ctaTg}
-        mock={c.heroMock}
       />
 
       <Reveal>
