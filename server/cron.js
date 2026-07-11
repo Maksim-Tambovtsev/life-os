@@ -1,7 +1,7 @@
 require('dotenv').config();
 const cron = require('node-cron');
 const { Telegraf } = require('telegraf');
-const { getAllUsers, getLastNDays, getStreak, getGoalStreak, setPendingPattern } = require('./db');
+const { getAllUsers, getLastNDays, getStreak, getGoalStreak, setPendingPattern, setPendingWeeklyRating } = require('./db');
 const { chatReply } = require('./coach');
 const log = require('./logger').make('cron');
 
@@ -163,6 +163,8 @@ cron.schedule('0 18 * * 5', async () => {
       `Цель: ${user.goal_year}\n\n` +
       `Как продвинулся? Оцени от 1 до 10 и напиши пару слов.`
     );
+    // Ответ пользователя поймает бот и сохранит оценку для дашборда
+    setPendingWeeklyRating(user.user_id, true);
   }
 });
 

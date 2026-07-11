@@ -19,6 +19,7 @@ const {
   setPendingPattern, clearPendingPattern,
   saveReflection, getLastReflection,
   createLoginToken, consumeLoginToken,
+  updateProfile, setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,
 } = require('./db');
 
 // Дата N дней назад в формате YYYY-MM-DD, как хранится в БД
@@ -182,4 +183,45 @@ test('consumeLoginToken rejects expired tokens', () => {
   db.close();
 
   assert.equal(consumeLoginToken(token), null);
+});
+
+test('updateProfile updates only whitelisted provided fields', () => {
+  const userId = 'prof1';
+  saveUser({ user_id: userId, name: 'Имя', goal_year: 'Старая цель', onboarded: 1 });
+
+  const changed = updateProfile(userId, {
+    goal_year: 'Новая цель',
+    agent_ctx_health: 'бегаю по утрам, болит колено',
+    user_id: 'hacker-attempt', // не в белом списке — должно игнорироваться
+    onboarded: 0,              // не в белом списке — должно игнорироваться
+  });
+
+  assert.equal(changed, true);
+  const user = getUser(userId);
+  assert.equal(user.goal_year, 'Новая цель');
+  assert.equal(user.agent_ctx_health, 'бегаю по утрам, болит колено');
+  assert.equal(user.user_id, userId);
+  assert.equal(user.onboarded, 1);
+});
+
+test('updateProfile returns false when nothing editable is passed', () => {
+  saveUser({ user_id: 'prof2', onboarded: 1 });
+  assert.equal(updateProfile('prof2', { onboarded: 0 }), false);
+});
+
+test('weekly rating flag + save + list round-trip', () => {
+  const userId = 'wr1';
+  saveUser({ user_id: userId, onboarded: 1 });
+
+  setPendingWeeklyRating(userId, true);
+  assert.equal(getUser(userId).pending_weekly_rating, 1);
+
+  saveWeeklyRating(userId, 7, 'норм неделя');
+  setPendingWeeklyRating(userId, false);
+  assert.equal(getUser(userId).pending_weekly_rating, 0);
+
+  const ratings = getWeeklyRatings(userId);
+  assert.equal(ratings.length, 1);
+  assert.equal(ratings[0].rating, 7);
+  assert.equal(ratings[0].note, 'норм неделя');
 });

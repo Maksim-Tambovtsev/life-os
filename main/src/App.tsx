@@ -13,16 +13,17 @@ import Testimonial from './components/Testimonial/Testimonial'
 import Preview from './components/Preview/Preview'
 import Footer from './components/Footer/Footer'
 import Dashboard from './components/Dashboard/Dashboard'
+import AgentsPanel from './components/Agents/AgentsPanel'
 import Reveal from './components/ui/Reveal'
 
-type View = 'landing' | 'dashboard'
+type View = 'landing' | 'dashboard' | 'agents'
 
 export default function App() {
   const [lang, setLang] = useState<Lang>('ru')
   const [view, setView] = useState<View>('landing')
   const c = content[lang]
 
-  const { token, user, loginTelegram, loginDev, loginWithToken } = useAuth()
+  const { token, user, loginTelegram, loginDev, loginWithToken, updateProfile } = useAuth()
   const { data: statsData, loading: statsLoading, error: statsError } = useStats(token)
   const [tokenLoginError, setTokenLoginError] = useState<string | null>(null)
 
@@ -41,7 +42,7 @@ export default function App() {
     loginWithToken(loginToken).catch((e: Error) => setTokenLoginError(e.message))
   }, [loginWithToken])
 
-  if (view === 'dashboard') {
+  if (view === 'dashboard' || view === 'agents') {
     if (!token) {
       return (
         <LoginScreen
@@ -53,12 +54,23 @@ export default function App() {
         />
       )
     }
+    if (view === 'agents') {
+      return (
+        <AgentsPanel
+          profile={user}
+          onSave={updateProfile}
+          onBack={() => setView('dashboard')}
+          lang={lang}
+        />
+      )
+    }
     return (
       <Dashboard
         data={statsData}
         loading={statsLoading}
         error={statsError}
         onBack={() => setView('landing')}
+        onOpenAgents={() => setView('agents')}
         lang={lang}
         name={user?.name ?? null}
       />

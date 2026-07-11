@@ -7,12 +7,20 @@ export interface DayData {
   energy: number
 }
 
+export interface WeeklyRating {
+  date: string
+  rating: number
+  note: string | null
+}
+
 export interface StatsData {
   streak: number
   avgSleep: number | null
   avgEnergy: number | null
   week: DayData[]
   month: DayData[]
+  goalProgressPct: number
+  weeklyRatings: WeeklyRating[]
 }
 
 export function useStats(token: string | null) {

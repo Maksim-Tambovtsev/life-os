@@ -21,6 +21,21 @@ export interface Profile {
   goal_year: string | null
   priority: string | null
   onboarded: number
+  agent_ctx_health?: string | null
+  agent_ctx_strategist?: string | null
+  agent_ctx_focus?: string | null
+  agent_ctx_mentor?: string | null
+  agent_ctx_analyst?: string | null
+}
+
+// Поля профиля, которые можно редактировать с сайта (раздел «Мои агенты»)
+export interface ProfileUpdate {
+  goal_year?: string
+  agent_ctx_health?: string
+  agent_ctx_strategist?: string
+  agent_ctx_focus?: string
+  agent_ctx_mentor?: string
+  agent_ctx_analyst?: string
 }
 
 export function getToken(): string | null {
@@ -75,6 +90,25 @@ export function useAuth() {
     save(res.token, res.user)
   }, [save])
 
+  const updateProfile = useCallback(async (fields: ProfileUpdate) => {
+    const r = await fetch(`${API_URL}/api/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify(fields),
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }))
+      throw new Error(err.error || `HTTP ${r.status}`)
+    }
+    const updated = (await r.json()) as Profile
+    localStorage.setItem(USER_KEY, JSON.stringify(updated))
+    setUser(updated)
+    return updated
+  }, [])
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
@@ -82,5 +116,5 @@ export function useAuth() {
     setUser(null)
   }, [])
 
-  return { token, user, loginTelegram, loginDev, loginWithToken, logout }
+  return { token, user, loginTelegram, loginDev, loginWithToken, updateProfile, logout }
 }
