@@ -131,6 +131,13 @@ function getLastReflection(userId) {
   return db.prepare('SELECT * FROM reflections WHERE user_id = ? ORDER BY date DESC LIMIT 1').get(userId) || null;
 }
 
+// Последние N рефлексий для ленты на дашборде — самые новые первыми
+function getRecentReflections(userId, limit = 7) {
+  return db.prepare(
+    'SELECT date, summary FROM reflections WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?'
+  ).all(userId, limit);
+}
+
 function getLastNDays(userId, n) {
   // Один ряд на день: при повторном чек-ине за день берём последний,
   // иначе дубликаты ломают графики и искажают средние.
@@ -330,7 +337,7 @@ module.exports = {
   getUser, saveUser, isOnboarded, getAllUsers,
   setGoalProgress, getGoalProgressStats, getGoalStreak,
   setPendingPattern, clearPendingPattern,
-  saveReflection, getLastReflection,
+  saveReflection, getLastReflection, getRecentReflections,
   createLoginToken, consumeLoginToken,
   updateProfile, PROFILE_EDITABLE_FIELDS,
   setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,

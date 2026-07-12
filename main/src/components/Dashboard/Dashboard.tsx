@@ -3,6 +3,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import type { StatsData } from '../../hooks/useStats'
+import ReflectionsFeed from './ReflectionsFeed'
 import type { Lang } from '../../content'
 import s from './Dashboard.module.css'
 
@@ -19,7 +20,7 @@ const LABELS = {
     energyWeek: 'Энергия — последние 7 дней',
     sleepWeek: 'Сон — последние 7 дней',
     trends: 'Тренды за 30 дней',
-    noData: 'Данных пока нет. Пройди первый /checkin в Telegram, потом обнови страницу.',
+    noData: 'Данных пока нет. Пройди первую рефлексию в Telegram (📝 Рефлексия), потом обнови страницу.',
     loading: 'Загрузка данных…',
     errorPrefix: 'Не удалось загрузить данные: ',
     greeting: 'Привет',
@@ -31,6 +32,8 @@ const LABELS = {
     goalBarTitle: 'Прогресс к цели — еженедельные оценки',
     goalBarLatest: 'Последняя оценка',
     goalBarEmpty: 'Оценок пока нет. Бот спросит о прогрессе в пятницу вечером — ответь числом от 1 до 10.',
+    reflectionsTitle: 'История рефлексий',
+    reflectionsEmpty: 'Рефлексий пока нет. Нажми «📝 Рефлексия» в боте вечером — итоги дня появятся здесь.',
   },
   en: {
     back: '← Landing',
@@ -44,7 +47,7 @@ const LABELS = {
     energyWeek: 'Energy — last 7 days',
     sleepWeek: 'Sleep — last 7 days',
     trends: 'Trends — last 30 days',
-    noData: 'No data yet. Complete your first /checkin in Telegram, then refresh.',
+    noData: 'No data yet. Complete your first reflection in Telegram (📝 Рефлексия), then refresh.',
     loading: 'Loading data…',
     errorPrefix: 'Failed to load data: ',
     greeting: 'Hey',
@@ -56,6 +59,8 @@ const LABELS = {
     goalBarTitle: 'Goal progress — weekly ratings',
     goalBarLatest: 'Latest rating',
     goalBarEmpty: 'No ratings yet. The bot asks about progress on Friday evening — reply with a number 1–10.',
+    reflectionsTitle: 'Reflection history',
+    reflectionsEmpty: 'No reflections yet. Tap «📝 Рефлексия» in the bot in the evening — your day summaries will appear here.',
   },
 }
 
@@ -256,6 +261,16 @@ export default function Dashboard({ data, loading, error, onBack, onOpenAgents, 
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+
+            {/* История рефлексий — итоги дня из бота */}
+            <div className={s.chartCardWide}>
+              <p className={s.chartLabel}>{t.reflectionsTitle}</p>
+              {data.reflections && data.reflections.length > 0 ? (
+                <ReflectionsFeed reflections={data.reflections} lang={lang} />
+              ) : (
+                <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>{t.reflectionsEmpty}</p>
+              )}
             </div>
 
             {/* Тренды за 30 дней — только если достаточно данных */}

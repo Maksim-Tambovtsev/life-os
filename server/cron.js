@@ -125,7 +125,7 @@ cron.schedule('*/5 * * * *', async () => {
 
     if (todayCheckins.length > 0) continue; // уже чекинился
 
-    await send(user.user_id, `⏰ Время чекина! /checkin`);
+    await send(user.user_id, `⏰ Время подвести итоги дня! Нажми 📝 Рефлексия или напиши /reflection`);
   }
 });
 

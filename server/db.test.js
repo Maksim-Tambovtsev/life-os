@@ -20,6 +20,7 @@ const {
   saveReflection, getLastReflection,
   createLoginToken, consumeLoginToken,
   updateProfile, setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,
+  getRecentReflections,
 } = require('./db');
 
 // Дата N дней назад в формате YYYY-MM-DD, как хранится в БД
@@ -236,4 +237,24 @@ test('getLastNDays returns one row per date — the latest checkin wins', () => 
   assert.equal(days.length, 1);
   assert.equal(days[0].energy, 9);
   assert.equal(days[0].reflection, 'второй');
+});
+
+test('getRecentReflections returns newest first and respects limit', () => {
+  const userId = 'reflFeed1';
+  saveReflection({ user_id: userId, date: daysAgo(3), answers: ['a'], summary: 'день -3' });
+  saveReflection({ user_id: userId, date: daysAgo(1), answers: ['b'], summary: 'день -1' });
+  saveReflection({ user_id: userId, date: daysAgo(2), answers: ['c'], summary: 'день -2' });
+  saveReflection({ user_id: userId, date: daysAgo(0), answers: ['d'], summary: 'сегодня' });
+
+  const feed = getRecentReflections(userId, 3);
+  assert.equal(feed.length, 3);
+  assert.equal(feed[0].summary, 'сегодня');
+  assert.equal(feed[1].summary, 'день -1');
+  assert.equal(feed[2].summary, 'день -2');
+});
+
+test('getRecentReflections scopes to the user', () => {
+  saveReflection({ user_id: 'reflFeed2', answers: ['x'], summary: 'чужая', date: daysAgo(0) });
+  const feed = getRecentReflections('reflFeed3');
+  assert.equal(feed.length, 0);
 });

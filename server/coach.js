@@ -14,39 +14,6 @@ function withDate(systemPrompt) {
 }
 
 /**
- * Ответ коуча после чек-ина (режим HEALTH).
- * @param {object}      checkin    — данные сегодняшнего чек-ина
- * @param {object[]}    recentDays — последние 7 дней из БД
- * @param {object|null} user       — профиль пользователя
- */
-async function coachReply(checkin, recentDays, user = null) {
-  const historyText = recentDays.length > 1
-    ? recentDays
-        .slice(0, -1)
-        .map((d) => `  ${d.date}: сон ${d.sleep_hours}ч, энергия ${d.energy}/10`)
-        .join('\n')
-    : '  Это первый чек-ин.';
-
-  const userMessage =
-    `Чек-ин (${checkin.date}):\n` +
-    `- Сон: ${checkin.sleep_hours} ч\n` +
-    `- Пробуждение: ${checkin.wake_quality}/10\n` +
-    `- Активность: ${checkin.activity}\n` +
-    `- Энергия: ${checkin.energy}/10\n` +
-    `- Рефлексия: "${checkin.reflection}"\n\n` +
-    `История последних дней:\n${historyText}`;
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 400,
-    system: withDate(getPrompt('CHECKIN', user)),
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
-  return response.content[0].text;
-}
-
-/**
  * Свободный диалог с коучем.
  * @param {object} opts
  * @param {string}      opts.message        — текст от пользователя
@@ -143,4 +110,4 @@ async function getPatternAdvice(pattern, patternCtx, userReply, user = null, rec
   return chatReply({ message, mode: 'HEALTH', user, recentCheckins, history: [] });
 }
 
-module.exports = { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate };
+module.exports = { chatReply, analyzeGoalProgress, getPatternAdvice, withDate };

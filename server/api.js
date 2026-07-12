@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken, updateProfile, PROFILE_EDITABLE_FIELDS, getGoalProgressStats, getWeeklyRatings } = require('./db');
+const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken, updateProfile, PROFILE_EDITABLE_FIELDS, getGoalProgressStats, getWeeklyRatings, getRecentReflections } = require('./db');
 const { verifyTelegramAuth, signToken, authMiddleware } = require('./auth');
 const log = require('./logger').make('api');
 
@@ -146,12 +146,14 @@ app.get('/api/stats', authMiddleware, (req, res) => {
   // Прогресс к цели: % дней с шагом к цели за неделю + еженедельные оценки 1-10
   const goalWeek = getGoalProgressStats(req.userId, 7);
   const weeklyRatings = getWeeklyRatings(req.userId, 12);
+  const reflections = getRecentReflections(req.userId, 7);
 
   res.json({
     streak, avgSleep, avgEnergy,
     week: toChart(week), month: toChart(month),
     goalProgressPct: goalWeek.percentage,
     weeklyRatings,
+    reflections,
   });
 });
 
