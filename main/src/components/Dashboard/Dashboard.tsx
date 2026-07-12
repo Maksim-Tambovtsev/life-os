@@ -4,6 +4,7 @@ import {
 } from 'recharts'
 import type { StatsData } from '../../hooks/useStats'
 import ReflectionsFeed from './ReflectionsFeed'
+import EnergyHeatmap from './EnergyHeatmap'
 import type { Lang } from '../../content'
 import s from './Dashboard.module.css'
 
@@ -32,6 +33,7 @@ const LABELS = {
     goalBarTitle: 'Прогресс к цели — еженедельные оценки',
     goalBarLatest: 'Последняя оценка',
     goalBarEmpty: 'Оценок пока нет. Бот спросит о прогрессе в пятницу вечером — ответь числом от 1 до 10.',
+    heatmapTitle: 'Энергия за год',
     reflectionsTitle: 'История рефлексий',
     reflectionsEmpty: 'Рефлексий пока нет. Нажми «📝 Рефлексия» в боте вечером — итоги дня появятся здесь.',
   },
@@ -59,6 +61,7 @@ const LABELS = {
     goalBarTitle: 'Goal progress — weekly ratings',
     goalBarLatest: 'Latest rating',
     goalBarEmpty: 'No ratings yet. The bot asks about progress on Friday evening — reply with a number 1–10.',
+    heatmapTitle: 'Energy — last 365 days',
     reflectionsTitle: 'Reflection history',
     reflectionsEmpty: 'No reflections yet. Tap «📝 Рефлексия» in the bot in the evening — your day summaries will appear here.',
   },
@@ -262,6 +265,14 @@ export default function Dashboard({ data, loading, error, onBack, onOpenAgents, 
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* Тепловая карта энергии за год */}
+            {data.year && data.year.length > 0 && (
+              <div className={s.chartCardWide}>
+                <p className={s.chartLabel}>{t.heatmapTitle}</p>
+                <EnergyHeatmap year={data.year} lang={lang} />
+              </div>
+            )}
 
             {/* История рефлексий — итоги дня из бота */}
             <div className={s.chartCardWide}>

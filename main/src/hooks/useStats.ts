@@ -27,6 +27,7 @@ export interface StatsData {
   goalProgressPct: number
   weeklyRatings: WeeklyRating[]
   reflections: ReflectionEntry[]
+  year: { date: string; energy: number | null }[]
 }
 
 export function useStats(token: string | null) {

@@ -148,12 +148,16 @@ app.get('/api/stats', authMiddleware, (req, res) => {
   const weeklyRatings = getWeeklyRatings(req.userId, 12);
   const reflections = getRecentReflections(req.userId, 7);
 
+  // Год данных для тепловой карты — только дата и энергия
+  const year = getLastNDays(req.userId, 365).map((r) => ({ date: r.date, energy: r.energy }));
+
   res.json({
     streak, avgSleep, avgEnergy,
     week: toChart(week), month: toChart(month),
     goalProgressPct: goalWeek.percentage,
     weeklyRatings,
     reflections,
+    year,
   });
 });
 
