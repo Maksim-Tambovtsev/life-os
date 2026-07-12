@@ -5,6 +5,7 @@ import {
 import type { StatsData } from '../../hooks/useStats'
 import ReflectionsFeed from './ReflectionsFeed'
 import EnergyHeatmap from './EnergyHeatmap'
+import Achievements from './Achievements'
 import type { Lang } from '../../content'
 import s from './Dashboard.module.css'
 
@@ -34,6 +35,7 @@ const LABELS = {
     goalBarLatest: 'Последняя оценка',
     goalBarEmpty: 'Оценок пока нет. Бот спросит о прогрессе в пятницу вечером — ответь числом от 1 до 10.',
     heatmapTitle: 'Энергия за год',
+    achievementsTitle: 'Достижения',
     reflectionsTitle: 'История рефлексий',
     reflectionsEmpty: 'Рефлексий пока нет. Нажми «📝 Рефлексия» в боте вечером — итоги дня появятся здесь.',
   },
@@ -62,6 +64,7 @@ const LABELS = {
     goalBarLatest: 'Latest rating',
     goalBarEmpty: 'No ratings yet. The bot asks about progress on Friday evening — reply with a number 1–10.',
     heatmapTitle: 'Energy — last 365 days',
+    achievementsTitle: 'Achievements',
     reflectionsTitle: 'Reflection history',
     reflectionsEmpty: 'No reflections yet. Tap «📝 Рефлексия» in the bot in the evening — your day summaries will appear here.',
   },
@@ -283,6 +286,14 @@ export default function Dashboard({ data, loading, error, onBack, onOpenAgents, 
                 <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>{t.reflectionsEmpty}</p>
               )}
             </div>
+
+            {/* Достижения */}
+            {data.achievements && data.achievements.length > 0 && (
+              <div className={s.chartCardWide}>
+                <p className={s.chartLabel}>{t.achievementsTitle}</p>
+                <Achievements achievements={data.achievements} lang={lang} />
+              </div>
+            )}
 
             {/* Тренды за 30 дней — только если достаточно данных */}
             {data.month.length > 7 && (

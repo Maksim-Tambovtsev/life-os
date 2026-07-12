@@ -28,6 +28,7 @@ export interface StatsData {
   weeklyRatings: WeeklyRating[]
   reflections: ReflectionEntry[]
   year: { date: string; energy: number | null }[]
+  achievements: { id: string; earned: boolean }[]
 }
 
 export function useStats(token: string | null) {
