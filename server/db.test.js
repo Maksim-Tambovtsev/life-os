@@ -20,6 +20,7 @@ const {
   saveReflection, getLastReflection,
   createLoginToken, consumeLoginToken,
   updateProfile, setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,
+  getRecentReflections, getMaxStreak, getCheckinDayCount, getReflectionCount,
 } = require('./db');
 
 // Дата N дней назад в формате YYYY-MM-DD, как хранится в БД
@@ -236,4 +237,50 @@ test('getLastNDays returns one row per date — the latest checkin wins', () => 
   assert.equal(days.length, 1);
   assert.equal(days[0].energy, 9);
   assert.equal(days[0].reflection, 'второй');
+});
+
+test('getRecentReflections returns newest first and respects limit', () => {
+  const userId = 'reflFeed1';
+  saveReflection({ user_id: userId, date: daysAgo(3), answers: ['a'], summary: 'день -3' });
+  saveReflection({ user_id: userId, date: daysAgo(1), answers: ['b'], summary: 'день -1' });
+  saveReflection({ user_id: userId, date: daysAgo(2), answers: ['c'], summary: 'день -2' });
+  saveReflection({ user_id: userId, date: daysAgo(0), answers: ['d'], summary: 'сегодня' });
+
+  const feed = getRecentReflections(userId, 3);
+  assert.equal(feed.length, 3);
+  assert.equal(feed[0].summary, 'сегодня');
+  assert.equal(feed[1].summary, 'день -1');
+  assert.equal(feed[2].summary, 'день -2');
+});
+
+test('getRecentReflections scopes to the user', () => {
+  saveReflection({ user_id: 'reflFeed2', answers: ['x'], summary: 'чужая', date: daysAgo(0) });
+  const feed = getRecentReflections('reflFeed3');
+  assert.equal(feed.length, 0);
+});
+
+test('getMaxStreak finds the longest historical run, not just the current one', () => {
+  const userId = 'maxstreak1';
+  // серия из 4 дней в прошлом, разрыв, потом 2 дня подряд к сегодня
+  for (const i of [10, 9, 8, 7, 1, 0]) {
+    saveCheckin({ user_id: userId, date: daysAgo(i), sleep_hours: 7, wake_quality: 7, activity: 'нет', energy: 7, reflection: '', goal_progress: null });
+  }
+  assert.equal(getMaxStreak(userId), 4);
+});
+
+test('getMaxStreak is 0 with no checkins and counts duplicates once', () => {
+  assert.equal(getMaxStreak('maxstreak-none'), 0);
+
+  const userId = 'maxstreak2';
+  saveCheckin({ user_id: userId, date: daysAgo(0), sleep_hours: 7, wake_quality: 7, activity: 'нет', energy: 7, reflection: '', goal_progress: null });
+  saveCheckin({ user_id: userId, date: daysAgo(0), sleep_hours: 8, wake_quality: 8, activity: 'нет', energy: 8, reflection: '', goal_progress: null });
+  assert.equal(getMaxStreak(userId), 1);
+  assert.equal(getCheckinDayCount(userId), 1);
+});
+
+test('getReflectionCount counts only own reflections', () => {
+  saveReflection({ user_id: 'rc1', date: daysAgo(0), answers: ['a'], summary: 's' });
+  saveReflection({ user_id: 'rc1', date: daysAgo(1), answers: ['b'], summary: 's' });
+  saveReflection({ user_id: 'rc2', date: daysAgo(0), answers: ['c'], summary: 's' });
+  assert.equal(getReflectionCount('rc1'), 2);
 });

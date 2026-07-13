@@ -1,17 +1,6 @@
 import Badge from '../ui/Badge'
-import HeroMock from '../HeroMock/HeroMock'
+import AiCore from '../AiCore/AiCore'
 import s from './Hero.module.css'
-
-interface HeroMockData {
-  greeting: string
-  streak: string
-  energy: string
-  sleep: string
-  energyVal: string
-  sleepVal: string
-  chart: string
-  dayLabels: string[]
-}
 
 const TG_LINK = 'https://t.me/CoreOS_ai_bot'
 
@@ -22,10 +11,9 @@ interface HeroProps {
   subtitle: string
   cta1: string
   ctaTg: string
-  mock: HeroMockData
 }
 
-export default function Hero({ badge, title1, title2, subtitle, cta1, ctaTg, mock }: HeroProps) {
+export default function Hero({ badge, title1, title2, subtitle, cta1, ctaTg }: HeroProps) {
   return (
     <section className={s.section}>
       <div className={s.blob1} />
@@ -60,7 +48,7 @@ export default function Hero({ badge, title1, title2, subtitle, cta1, ctaTg, moc
         </div>
 
         <div className={s.visual}>
-          <HeroMock {...mock} />
+          <AiCore />
         </div>
       </div>
     </section>

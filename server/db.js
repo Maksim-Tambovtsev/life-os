@@ -131,6 +131,13 @@ function getLastReflection(userId) {
   return db.prepare('SELECT * FROM reflections WHERE user_id = ? ORDER BY date DESC LIMIT 1').get(userId) || null;
 }
 
+// Последние N рефлексий для ленты на дашборде — самые новые первыми
+function getRecentReflections(userId, limit = 7) {
+  return db.prepare(
+    'SELECT date, summary FROM reflections WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?'
+  ).all(userId, limit);
+}
+
 function getLastNDays(userId, n) {
   // Один ряд на день: при повторном чек-ине за день берём последний,
   // иначе дубликаты ломают графики и искажают средние.
@@ -171,6 +178,39 @@ function getStreak(userId) {
   }
 
   return streak;
+}
+
+// Максимальный стрик за всю историю (для достижений)
+function getMaxStreak(userId) {
+  const rows = db.prepare(
+    'SELECT DISTINCT date FROM checkins WHERE user_id = ? ORDER BY date ASC'
+  ).all(userId);
+
+  let max = 0;
+  let cur = 0;
+  let prev = null;
+
+  for (const { date } of rows) {
+    if (prev) {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 1);
+      cur = next.toISOString().slice(0, 10) === date ? cur + 1 : 1;
+    } else {
+      cur = 1;
+    }
+    if (cur > max) max = cur;
+    prev = date;
+  }
+  return max;
+}
+
+// Сколько разных дней с чек-ином за всю историю
+function getCheckinDayCount(userId) {
+  return db.prepare('SELECT COUNT(DISTINCT date) AS n FROM checkins WHERE user_id = ?').get(userId).n;
+}
+
+function getReflectionCount(userId) {
+  return db.prepare('SELECT COUNT(*) AS n FROM reflections WHERE user_id = ?').get(userId).n;
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -330,7 +370,8 @@ module.exports = {
   getUser, saveUser, isOnboarded, getAllUsers,
   setGoalProgress, getGoalProgressStats, getGoalStreak,
   setPendingPattern, clearPendingPattern,
-  saveReflection, getLastReflection,
+  saveReflection, getLastReflection, getRecentReflections,
+  getMaxStreak, getCheckinDayCount, getReflectionCount,
   createLoginToken, consumeLoginToken,
   updateProfile, PROFILE_EDITABLE_FIELDS,
   setPendingWeeklyRating, saveWeeklyRating, getWeeklyRatings,

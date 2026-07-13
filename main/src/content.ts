@@ -91,16 +91,6 @@ export const content = {
       tgLink: 'https://t.me/CoreOS_ai_bot',
       copy: '© 2025 Life OS',
     },
-    heroMock: {
-      greeting: 'Доброе утро, Максим 👋',
-      streak: '🔥 7 дней подряд',
-      energy: 'Энергия',
-      sleep: 'Сон',
-      energyVal: '82%',
-      sleepVal: '7.5ч',
-      chart: 'Неделя в графике',
-      dayLabels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-    },
     dashTab: {
       title: 'Дашборд',
       greeting: 'Доброе утро, Максим',
@@ -224,16 +214,6 @@ export const content = {
       tgLabel: 'Start → t.me/CoreOS_ai_bot',
       tgLink: 'https://t.me/CoreOS_ai_bot',
       copy: '© 2025 Life OS',
-    },
-    heroMock: {
-      greeting: 'Good morning, Maksym 👋',
-      streak: '🔥 7 days in a row',
-      energy: 'Energy',
-      sleep: 'Sleep',
-      energyVal: '82%',
-      sleepVal: '7.5h',
-      chart: 'Week at a glance',
-      dayLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     },
     dashTab: {
       title: 'Dashboard',

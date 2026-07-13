@@ -1,8 +1,8 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
-const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, getLastReflection, clearPendingPattern, createLoginToken, setPendingWeeklyRating, saveWeeklyRating } = require('./db');
-const { coachReply, chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
+const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, clearPendingPattern, createLoginToken, setPendingWeeklyRating, saveWeeklyRating } = require('./db');
+const { chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 const log = require('./logger').make('bot');
 
@@ -11,7 +11,7 @@ const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // sessions[chatId] = {
-//   type: 'onboarding' | 'checkin' | null,
+//   type: 'onboarding' | 'reflection' | 'profile_edit' | null,
 //   step: number,
 //   data: {},
 //   history: [{role, content}],   // история свободного диалога
@@ -66,22 +66,37 @@ const PROFILE_EDIT_FIELDS = {
   'Изменить время': { field: 'reminder_time', question: '🔔 Введи новое время напоминания в формате ЧЧ:ММ (например, 21:00):' },
 };
 
-function getProfileKeyboard() {
-  return Markup.keyboard(['Изменить цель', 'Изменить имя', 'Изменить время']).resize();
-}
-
 function getMainKeyboard() {
   return Markup.keyboard([
-    ['📝 Рефлексия', '💪 Здоровье'],
+    ['📝 Рефлексия'],
     ['📊 Анализ', '💬 Поговорить'],
   ]).resize();
 }
 
-async function startReflectionFlow(ctx, chatId, session) {
-  const user = getUser(String(chatId));
-  session.type = 'reflection';
-  session.data = { user_id: String(chatId) };
+// Единый вечерний флоу: короткие структурные вопросы (для графиков),
+// затем свободная рефлексия — один разбор дня вместо чекин + рефлексия отдельно.
+const REFLECTION_STEPS = [
+  { field: 'sleep_hours',  question: '😴 Сколько часов ты спал? (например: 7.5)' },
+  { field: 'wake_quality', question: '🌅 Как проснулся? Оцени от 1 до 10' },
+  { field: 'activity',     question: '🏃 Была активность? (велосипед / хайкинг / зал / нет)' },
+  { field: 'energy',       question: '⚡ Энергия сейчас? Оцени от 1 до 10' },
+];
 
+async function startReflectionFlow(ctx, chatId, session) {
+  session.type = 'reflection';
+  session.step = 0;
+  session.data = { user_id: String(chatId), date: new Date().toISOString().slice(0, 10) };
+  session.history = []; // рефлексия начинает разговор с чистого листа
+
+  await ctx.reply(
+    'Подведём итоги дня. Сначала четыре коротких вопроса.\n\n' + REFLECTION_STEPS[0].question,
+    Markup.removeKeyboard()
+  );
+}
+
+// Финальный вопрос флоу — свободная рефлексия по списку вопросов
+async function askReflectionText(ctx, chatId) {
+  const user = getUser(String(chatId));
   const previousPlan = user?.last_tomorrow_plan;
 
   const questions = [...REFLECTION_QUESTIONS];
@@ -92,20 +107,24 @@ async function startReflectionFlow(ctx, chatId, session) {
   const numbered = questions.map((q, i) => `${i + 1}. ${q}`).join('\n');
 
   await ctx.reply(
-    `Вопросы для рефлексии:\n\n${numbered}\n\nОтветь одним сообщением — по пунктам или свободным текстом, как удобно.`,
-    Markup.removeKeyboard()
+    `Теперь рефлексия:\n\n${numbered}\n\nОтветь одним сообщением — по пунктам или свободным текстом, как удобно.`
   );
 }
 
-async function summarizeReflection(reflectionText, user) {
+async function summarizeReflection(reflectionText, user, dayStats = null) {
   const system = withDate(`${getPrompt('HEALTH', user)}\n\n${getPrompt('STRATEGIST', user)}\n\n${REFLECTION_SUMMARY_PROMPT}`);
+
+  const statsLine = dayStats
+    ? `Данные дня: сон ${dayStats.sleep_hours} ч, пробуждение ${dayStats.wake_quality}/10, ` +
+      `активность: ${dayStats.activity}, энергия ${dayStats.energy}/10.\n\n`
+    : '';
 
   try {
     const response = await anthropicClient.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 700,
       system,
-      messages: [{ role: 'user', content: `Рефлексия пользователя:\n\n${reflectionText}` }],
+      messages: [{ role: 'user', content: `${statsLine}Рефлексия пользователя:\n\n${reflectionText}` }],
     });
     return response.content[0].text;
   } catch (error) {
@@ -116,43 +135,116 @@ async function summarizeReflection(reflectionText, user) {
 
 async function handleReflectionFlow(ctx, chatId, session) {
   const answer = ctx.message.text.trim();
-  const user = getUser(String(chatId));
 
+  // Этап 1: структурные вопросы (сон / пробуждение / активность / энергия)
+  if (session.step < REFLECTION_STEPS.length) {
+    const currentStep = REFLECTION_STEPS[session.step];
+
+    if (currentStep.field === 'sleep_hours') {
+      const num = parseFloat(answer);
+      if (isNaN(num) || num < 0 || num > 24) {
+        await ctx.reply('Введи число, например 7 или 7.5');
+        return;
+      }
+      session.data.sleep_hours = num;
+    } else if (currentStep.field === 'wake_quality' || currentStep.field === 'energy') {
+      const num = parseInt(answer, 10);
+      if (isNaN(num) || num < 1 || num > 10) {
+        await ctx.reply('Введи число от 1 до 10');
+        return;
+      }
+      session.data[currentStep.field] = num;
+    } else {
+      session.data[currentStep.field] = answer;
+    }
+
+    session.step += 1;
+
+    if (session.step < REFLECTION_STEPS.length) {
+      await ctx.reply(REFLECTION_STEPS[session.step].question);
+    } else {
+      await askReflectionText(ctx, chatId);
+    }
+    return;
+  }
+
+  // Этап 2: свободная рефлексия — сохраняем всё и делаем один разбор дня
   if (!answer) {
     await ctx.reply('Напиши хоть пару слов, чтобы продолжить.');
     return;
   }
 
-  await ctx.reply('Анализирую...');
-
-  const reflectionDate = new Date().toISOString().slice(0, 10);
-  const summary = await summarizeReflection(answer, user);
-
-  saveReflection({
-    user_id: String(chatId),
-    date: reflectionDate,
-    answers: [answer],
-    summary,
-  });
-
-  // Извлекаем задачи на завтра для утреннего напоминания
-  const tasksMatch = summary.match(/<b>Задачи на завтра<\/b>\n\n([\s\S]+?)(?:\n\n|$)/);
-  const tasksText = tasksMatch ? tasksMatch[1].trim() : '';
-
-  saveUser({
-    user_id: String(chatId),
-    name: user?.name,
-    goal_year: user?.goal_year,
-    priority: user?.priority,
-    reminder_time: user?.reminder_time,
-    onboarded: user?.onboarded ?? 1,
-    last_tomorrow_plan: tasksText,
-  });
-
+  const user = getUser(String(chatId));
+  const checkin = { ...session.data, reflection: answer, goal_progress: null };
   session.type = null;
+  session.step = 0;
   session.data = {};
 
-  await ctx.replyWithHTML(`📝 Рефлексия сохранена.\n\n${summary}`, getMainKeyboard());
+  try {
+    saveCheckin(checkin);
+    const streak = getStreak(checkin.user_id);
+    const streakText = streak > 1 ? `🔥 Стрик: ${streak} дней подряд!` : '🌱 День первый — начало стрика!';
+
+    await ctx.reply(
+      '✅ День записан!\n\n' +
+      `📅 ${checkin.date}\n` +
+      `😴 Сон: ${checkin.sleep_hours} ч\n` +
+      `🌅 Пробуждение: ${checkin.wake_quality}/10\n` +
+      `🏃 Активность: ${checkin.activity}\n` +
+      `⚡ Энергия: ${checkin.energy}/10\n\n` +
+      streakText
+    );
+    await ctx.reply('🤖 Анализирую день…');
+
+    // Разбор дня и анализ шага к цели — параллельно
+    const [summary, goalResult] = await Promise.all([
+      summarizeReflection(answer, user, checkin),
+      analyzeGoalProgress(answer, user?.goal_year),
+    ]);
+
+    setGoalProgress(checkin.user_id, checkin.date, goalResult.progress ? 1 : 0);
+
+    saveReflection({
+      user_id: String(chatId),
+      date: checkin.date,
+      answers: [answer],
+      summary,
+    });
+
+    // Извлекаем задачи на завтра для утреннего напоминания
+    const tasksMatch = summary.match(/<b>Задачи на завтра<\/b>\n\n([\s\S]+?)(?:\n\n|$)/);
+    const tasksText = tasksMatch ? tasksMatch[1].trim() : '';
+
+    saveUser({
+      user_id: String(chatId),
+      name: user?.name,
+      goal_year: user?.goal_year,
+      priority: user?.priority,
+      reminder_time: user?.reminder_time,
+      onboarded: user?.onboarded ?? 1,
+      last_tomorrow_plan: tasksText,
+    });
+
+    const progressNote = goalResult.progress && goalResult.comment
+      ? `\n\n🎯 ${goalResult.comment}`
+      : '';
+
+    await ctx.replyWithHTML(`📝 Итог дня:\n\n${summary}${progressNote}`, getMainKeyboard());
+
+    // Итог идёт в историю как точка отсчёта разговора
+    pushHistory(chatId,
+      `Рефлексия ${checkin.date}: сон ${checkin.sleep_hours}ч, энергия ${checkin.energy}/10`,
+      summary
+    );
+
+  } catch (err) {
+    log.error('Ошибка рефлексии:', err);
+    if (err.message?.includes('anthropic') || err.status) {
+      await ctx.reply('⚠️ День записан, но AI-разбор временно недоступен.');
+    } else {
+      await ctx.reply('Что-то пошло не так при сохранении. Попробуй ещё раз.');
+    }
+  }
 }
 
 async function showProfile(ctx, chatId) {
@@ -219,16 +311,6 @@ async function handleProfileEdit(ctx, chatId, session) {
   await showProfile(ctx, chatId);
 }
 
-// ─── Чек-ин ──────────────────────────────────────────────────────────────────
-
-const CHECKIN_STEPS = [
-  { field: 'sleep_hours',  question: '😴 Сколько часов ты спал? (например: 7.5)' },
-  { field: 'wake_quality', question: '🌅 Как проснулся? Оцени от 1 до 10' },
-  { field: 'activity',     question: '🏃 Была активность? (велосипед / хайкинг / зал / нет)' },
-  { field: 'energy',       question: '⚡ Энергия сейчас? Оцени от 1 до 10' },
-  { field: 'reflection',   question: '💭 Пара слов, как прошёл день?' },
-];
-
 // ─── /start ──────────────────────────────────────────────────────────────────
 
 bot.command('start', async (ctx) => {
@@ -238,7 +320,7 @@ bot.command('start', async (ctx) => {
     const user = getUser(String(chatId));
     await ctx.reply(
       `Привет, ${user.name}! Рад снова видеть тебя. 👋\n\n` +
-      `Выбирай кнопку в меню: 💪 Здоровье для чек-ина, 📝 Рефлексия или просто пиши.`
+      `Нажми 📝 Рефлексия, чтобы подвести итоги дня, или просто пиши.`
     );
     await ctx.reply('Главное меню:', getMainKeyboard());
     return;
@@ -274,13 +356,13 @@ bot.command('login', async (ctx) => {
   await ctx.reply(`🔑 Ссылка для входа на сайт (действует 5 минут):\n${url}`);
 });
 
-// ─── /checkin ────────────────────────────────────────────────────────────────
+// ─── /reflection (и /checkin как алиас для старых пользователей) ─────────────
 
-bot.command('checkin', async (ctx) => {
+async function startReflectionOrOnboard(ctx) {
   const chatId = ctx.chat.id;
+  const session = getSession(chatId);
 
   if (!isOnboarded(String(chatId))) {
-    const session = getSession(chatId);
     session.type = 'onboarding';
     session.step = 0;
     session.data = { user_id: String(chatId) };
@@ -289,13 +371,15 @@ bot.command('checkin', async (ctx) => {
     return;
   }
 
-  const session = getSession(chatId);
-  session.type = 'checkin';
-  session.step = 0;
-  session.data = { user_id: String(chatId), date: new Date().toISOString().slice(0, 10) };
-  session.history = []; // чек-ин сбрасывает историю диалога
+  await startReflectionFlow(ctx, chatId, session);
+}
 
-  await ctx.reply('Начинаем чек-ин!\n\n' + CHECKIN_STEPS[0].question);
+bot.command('reflection', startReflectionOrOnboard);
+
+// Чекин объединён с рефлексией — команда осталась, чтобы не ломать привычку
+bot.command('checkin', async (ctx) => {
+  await ctx.reply('Чекин теперь часть рефлексии — один общий итог дня.');
+  await startReflectionOrOnboard(ctx);
 });
 
 // ─── Все текстовые сообщения ──────────────────────────────────────────────────
@@ -311,34 +395,14 @@ bot.on('text', async (ctx) => {
 
   // Главное меню кнопок (обрабатываем первыми)
   if (text === '📝 Рефлексия') {
-    if (!isOnboarded(String(chatId))) {
-      session.type = 'onboarding';
-      session.step = 0;
-      session.data = { user_id: String(chatId) };
-      await ctx.reply('Сначала познакомимся! 👋');
-      await askOnboardingStep(ctx, ONBOARDING_STEPS[0]);
-      return;
-    }
-
-    await startReflectionFlow(ctx, chatId, session);
+    await startReflectionOrOnboard(ctx);
     return;
   }
 
+  // Старая кнопка чекина — у части пользователей ещё висит прежняя клавиатура
   if (text === '💪 Здоровье') {
-    if (!isOnboarded(String(chatId))) {
-      session.type = 'onboarding';
-      session.step = 0;
-      session.data = { user_id: String(chatId) };
-      await ctx.reply('Сначала познакомимся! 👋');
-      await askOnboardingStep(ctx, ONBOARDING_STEPS[0]);
-      return;
-    }
-
-    session.type = 'checkin';
-    session.step = 0;
-    session.data = { user_id: String(chatId), date: new Date().toISOString().slice(0, 10) };
-    session.history = [];
-    await ctx.reply(CHECKIN_STEPS[0].question);
+    await ctx.reply('Чекин теперь часть рефлексии — один общий итог дня.');
+    await startReflectionOrOnboard(ctx);
     return;
   }
 
@@ -378,11 +442,6 @@ bot.on('text', async (ctx) => {
 
   if (session.type === 'onboarding') {
     await handleOnboarding(ctx, chatId, session);
-    return;
-  }
-
-  if (session.type === 'checkin') {
-    await handleCheckin(ctx, chatId, session);
     return;
   }
 
@@ -429,103 +488,16 @@ async function handleOnboarding(ctx, chatId, session) {
     `🎯 Цель: ${profile.goal_year}\n` +
     `⚡ Приоритет: ${profile.priority}\n` +
     `🔔 Напоминание: ${profile.reminder_time}\n\n` +
-    `Готово! Нажми кнопку 💪 Здоровье в меню, чтобы сделать чек-ин.\nИли просто пиши — я всегда здесь.`,
+    `Готово! Нажми 📝 Рефлексия вечером, чтобы подвести итоги дня.\nИли просто пиши — я всегда здесь.`,
     Markup.removeKeyboard()
   );
-}
-
-// ─── Логика чек-ина ──────────────────────────────────────────────────────────
-
-async function handleCheckin(ctx, chatId, session) {
-  const currentStep = CHECKIN_STEPS[session.step];
-  const answer = ctx.message.text.trim();
-
-  if (currentStep.field === 'sleep_hours') {
-    const num = parseFloat(answer);
-    if (isNaN(num) || num < 0 || num > 24) {
-      await ctx.reply('Введи число, например 7 или 7.5');
-      return;
-    }
-    session.data.sleep_hours = num;
-  } else if (currentStep.field === 'wake_quality' || currentStep.field === 'energy') {
-    const num = parseInt(answer, 10);
-    if (isNaN(num) || num < 1 || num > 10) {
-      await ctx.reply('Введи число от 1 до 10');
-      return;
-    }
-    session.data[currentStep.field] = num;
-  } else {
-    session.data[currentStep.field] = answer;
-  }
-
-  session.step += 1;
-
-  if (session.step < CHECKIN_STEPS.length) {
-    await ctx.reply(CHECKIN_STEPS[session.step].question);
-    return;
-  }
-
-  const checkin = { ...session.data, goal_progress: null };
-  session.type = null;
-  session.data = {};
-
-  try {
-    saveCheckin(checkin);
-    const streak = getStreak(checkin.user_id);
-    const streakText = streak > 1 ? `🔥 Стрик: ${streak} дней подряд!` : '🌱 День первый — начало стрика!';
-
-    await ctx.reply(
-      '✅ Чек-ин сохранён!\n\n' +
-      `📅 ${checkin.date}\n` +
-      `😴 Сон: ${checkin.sleep_hours} ч\n` +
-      `🌅 Пробуждение: ${checkin.wake_quality}/10\n` +
-      `🏃 Активность: ${checkin.activity}\n` +
-      `⚡ Энергия: ${checkin.energy}/10\n` +
-      `💭 ${checkin.reflection}\n\n` +
-      streakText
-    );
-
-    await ctx.reply('🤖 Анализирую данные…');
-    const recentDays = getLastNDays(checkin.user_id, 7);
-    const user = getUser(checkin.user_id);
-
-    // Запускаем коуч-ответ и анализ прогресса к цели параллельно
-    const [advice, goalResult] = await Promise.all([
-      coachReply(checkin, recentDays, user),
-      analyzeGoalProgress(checkin.reflection, user?.goal_year),
-    ]);
-
-    // Обновляем goal_progress в БД (0 или 1)
-    setGoalProgress(checkin.user_id, checkin.date, goalResult.progress ? 1 : 0);
-
-    // Добавляем отметку прогресса к ответу коуча если шаг был сделан
-    const progressNote = goalResult.progress && goalResult.comment
-      ? `\n\n🎯 ${goalResult.comment}`
-      : '';
-
-    await ctx.reply(`🤖 AI-коуч:\n\n${advice}${progressNote}`);
-
-    // После чек-ина коуч-ответ идёт в историю как точка отсчёта разговора
-    pushHistory(chatId,
-      `Чек-ин ${checkin.date}: сон ${checkin.sleep_hours}ч, энергия ${checkin.energy}/10`,
-      advice
-    );
-
-  } catch (err) {
-    log.error('Ошибка чек-ина:', err);
-    if (err.message?.includes('anthropic') || err.status) {
-      await ctx.reply('⚠️ Чек-ин сохранён, но AI-коуч временно недоступен.');
-    } else {
-      await ctx.reply('Что-то пошло не так при сохранении. Попробуй ещё раз.');
-    }
-  }
 }
 
 // ─── Свободный диалог ────────────────────────────────────────────────────────
 
 async function handleFreeChat(ctx, chatId, text, session) {
   if (!isOnboarded(String(chatId))) {
-    await ctx.reply('Напиши /start чтобы познакомиться, или /checkin для чек-ина.');
+    await ctx.reply('Напиши /start чтобы познакомиться, или /reflection для итогов дня.');
     return;
   }
 
@@ -597,6 +569,14 @@ async function handleFreeChat(ctx, chatId, text, session) {
 
 bot.launch();
 log.info('🤖 Life OS бот запущен');
+
+// Меню команд в Telegram (кнопка «/» рядом с полем ввода)
+bot.telegram.setMyCommands([
+  { command: 'reflection', description: 'Итоги дня: чекин + рефлексия' },
+  { command: 'profile', description: 'Мой профиль' },
+  { command: 'login', description: 'Ссылка для входа на сайт' },
+  { command: 'start', description: 'Перезапустить бота' },
+]).catch((e) => log.warn('setMyCommands failed:', e.message));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));

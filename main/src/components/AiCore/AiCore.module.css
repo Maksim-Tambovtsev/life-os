@@ -1,0 +1,120 @@
+.wrap {
+  position: relative;
+  width: min(380px, 78vw);
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: coreFloat 7s ease-in-out infinite;
+}
+
+.glowRing {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 159, 255, 0.16) 0%, transparent 70%);
+  filter: blur(6px);
+  animation: ringPulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 20px 60px rgba(77, 159, 255, 0.18));
+}
+
+.shell {
+  transition: stroke 0.3s;
+}
+
+.core {
+  animation: corePulse 3.2s ease-in-out infinite;
+  transform-origin: 190px 150px;
+}
+
+.corePupil {
+  animation: pupilPulse 3.2s ease-in-out infinite;
+  transform-origin: 190px 150px;
+}
+
+.gear {
+  animation: gearSpin 14s linear infinite;
+}
+
+.wire {
+  stroke-dasharray: 4 6;
+  animation: wireFlow 3s linear infinite;
+}
+
+.wire2 {
+  stroke-dasharray: 3 7;
+  animation: wireFlow 3.6s linear infinite reverse;
+}
+
+.orbit1 {
+  transform-origin: 190px 150px;
+  animation: orbitSpin 10s linear infinite;
+}
+
+.orbit2 {
+  transform-origin: 190px 150px;
+  animation: orbitSpin 14s linear infinite reverse;
+}
+
+.orbit3 {
+  transform-origin: 190px 150px;
+  animation: orbitSpin 18s linear infinite;
+}
+
+.sparkle {
+  animation: twinkle 2.4s ease-in-out infinite;
+  transform-origin: 276px 96px;
+}
+
+@keyframes coreFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes corePulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes pupilPulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes gearSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes wireFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -40; }
+}
+
+@keyframes orbitSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap, .glowRing, .core, .corePupil, .gear, .wire, .wire2, .orbit1, .orbit2, .orbit3, .sparkle {
+    animation: none;
+  }
+}

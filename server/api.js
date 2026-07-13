@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken, updateProfile, PROFILE_EDITABLE_FIELDS, getGoalProgressStats, getWeeklyRatings } = require('./db');
+const { getAll, getLastNDays, getStreak, getUser, saveUser, consumeLoginToken, updateProfile, PROFILE_EDITABLE_FIELDS, getGoalProgressStats, getWeeklyRatings, getRecentReflections, getMaxStreak, getCheckinDayCount, getReflectionCount } = require('./db');
 const { verifyTelegramAuth, signToken, authMiddleware } = require('./auth');
 const log = require('./logger').make('api');
 
@@ -146,12 +146,33 @@ app.get('/api/stats', authMiddleware, (req, res) => {
   // Прогресс к цели: % дней с шагом к цели за неделю + еженедельные оценки 1-10
   const goalWeek = getGoalProgressStats(req.userId, 7);
   const weeklyRatings = getWeeklyRatings(req.userId, 12);
+  const reflections = getRecentReflections(req.userId, 7);
+
+  // Год данных для тепловой карты — только дата и энергия
+  const year = getLastNDays(req.userId, 365).map((r) => ({ date: r.date, energy: r.energy }));
+
+  // Достижения выводятся из имеющихся данных — отдельного хранилища нет
+  const totalDays = getCheckinDayCount(req.userId);
+  const maxStreak = getMaxStreak(req.userId);
+  const achievements = [
+    { id: 'first_day', earned: totalDays >= 1 },
+    { id: 'first_reflection', earned: getReflectionCount(req.userId) >= 1 },
+    { id: 'streak_7', earned: maxStreak >= 7 },
+    { id: 'streak_14', earned: maxStreak >= 14 },
+    { id: 'streak_30', earned: maxStreak >= 30 },
+    { id: 'days_30', earned: totalDays >= 30 },
+    { id: 'days_100', earned: totalDays >= 100 },
+    { id: 'first_rating', earned: weeklyRatings.length >= 1 },
+  ];
 
   res.json({
     streak, avgSleep, avgEnergy,
     week: toChart(week), month: toChart(month),
     goalProgressPct: goalWeek.percentage,
     weeklyRatings,
+    reflections,
+    year,
+    achievements,
   });
 });
 

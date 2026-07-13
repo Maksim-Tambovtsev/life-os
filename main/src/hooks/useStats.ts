@@ -13,6 +13,11 @@ export interface WeeklyRating {
   note: string | null
 }
 
+export interface ReflectionEntry {
+  date: string
+  summary: string | null
+}
+
 export interface StatsData {
   streak: number
   avgSleep: number | null
@@ -21,6 +26,9 @@ export interface StatsData {
   month: DayData[]
   goalProgressPct: number
   weeklyRatings: WeeklyRating[]
+  reflections: ReflectionEntry[]
+  year: { date: string; energy: number | null }[]
+  achievements: { id: string; earned: boolean }[]
 }
 
 export function useStats(token: string | null) {
