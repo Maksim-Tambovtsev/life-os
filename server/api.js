@@ -202,7 +202,7 @@ function average(arr) {
   return Math.round((sum / valid.length) * 10) / 10; // 1 знак после запятой
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, process.env.HOST || undefined, () => {
   log.info(`🚀 API запущен на http://localhost:${PORT}`);
   if (process.env.DEV_LOGIN === '1') {
     log.warn('⚠️  DEV_LOGIN=1 — dev-вход включён, не используй в проде');

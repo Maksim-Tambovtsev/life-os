@@ -1,0 +1,23 @@
+.local/
+node_modules/
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+*.db
+*.db-shm
+*.db-wal
+*.tsbuildinfo
+
+# Owner-only planning, learning, and assistant context
+/AGENTS.md
+/learning/
+/planning/
+/business/
+/private-notes/
+/docs/learning/
+/docs/planning/
+/docs/business/
