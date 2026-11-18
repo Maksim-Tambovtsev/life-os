@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const Anthropic = require('@anthropic-ai/sdk');
 const { saveCheckin, getStreak, getLastNDays, getUser, saveUser, isOnboarded, setGoalProgress, saveReflection, clearPendingPattern, createLoginToken, setPendingWeeklyRating, saveWeeklyRating } = require('./db');
+const { getDraft, hasProcessedUpdate, commitDraftUpdate, saveSubmission, finishSubmission } = require('./db');
 const { chatReply, analyzeGoalProgress, getPatternAdvice, withDate } = require('./coach');
 const { detectMode, REFLECTION_QUESTIONS, getPrompt, REFLECTION_SUMMARY_PROMPT } = require('./prompts');
 const log = require('./logger').make('bot');
@@ -20,9 +21,33 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const sessions = {};
 
 function getSession(chatId) {
-  if (!sessions[chatId]) sessions[chatId] = { type: null, step: 0, data: {}, history: [] };
+  if (!sessions[chatId]) sessions[chatId] = { type: null, step: 0, data: {}, ...(getDraft(String(chatId)) || {}), history: [] };
   return sessions[chatId];
 }
+
+// Serialize updates per chat; persist user workflow state, never timer objects/chat history.
+const updateQueues = new Map();
+bot.use(async (ctx, next) => {
+  if (!ctx.chat || ctx.update.update_id == null) return next();
+  const id = String(ctx.chat.id), updateId = String(ctx.update.update_id);
+  const prior = updateQueues.get(id) || Promise.resolve();
+  let release;
+  const turn = new Promise(r => { release = r; });
+  updateQueues.set(id, turn);
+  await prior;
+  try {
+    if (hasProcessedUpdate(id, updateId)) return;
+    await next();
+    commitDraftUpdate(id, updateId, getSession(id));
+  } catch (error) {
+    // A failed DB write must not leave an advanced step only in RAM.
+    delete sessions[id];
+    throw error;
+  } finally {
+    release();
+    if (updateQueues.get(id) === turn) updateQueues.delete(id);
+  }
+});
 
 // Сбросить таймер очистки истории и поставить новый на 30 минут
 function resetHistoryTimer(chatId) {
@@ -32,6 +57,7 @@ function resetHistoryTimer(chatId) {
   session.historyTimer = setTimeout(() => {
     if (sessions[chatId]) sessions[chatId].history = [];
   }, 30 * 60 * 1000);
+  session.historyTimer.unref();
 }
 
 // Добавить пару user/assistant в историю, обрезать до 10 сообщений
@@ -86,7 +112,9 @@ async function startReflectionFlow(ctx, chatId, session) {
   session.type = 'reflection';
   session.step = 0;
   session.data = { user_id: String(chatId), date: new Date().toISOString().slice(0, 10) };
+  session.data.replaceConfirmed = Boolean(ctx.state.replaceConfirmed);
   session.history = []; // рефлексия начинает разговор с чистого листа
+  commitDraftUpdate(String(chatId), ctx.update.update_id, session);
 
   await ctx.reply(
     'Подведём итоги дня. Сначала четыре коротких вопроса.\n\n' + REFLECTION_STEPS[0].question,
@@ -129,7 +157,7 @@ async function summarizeReflection(reflectionText, user, dayStats = null) {
     return response.content[0].text;
   } catch (error) {
     log.error('Reflection summary error:', error);
-    return 'Рефлексия сохранена.';
+    throw error;
   }
 }
 
@@ -159,6 +187,7 @@ async function handleReflectionFlow(ctx, chatId, session) {
     }
 
     session.step += 1;
+    commitDraftUpdate(String(chatId), ctx.update.update_id, session);
 
     if (session.step < REFLECTION_STEPS.length) {
       await ctx.reply(REFLECTION_STEPS[session.step].question);
@@ -176,74 +205,36 @@ async function handleReflectionFlow(ctx, chatId, session) {
 
   const user = getUser(String(chatId));
   const checkin = { ...session.data, reflection: answer, goal_progress: null };
-  session.type = null;
-  session.step = 0;
-  session.data = {};
-
+  let submission;
   try {
-    saveCheckin(checkin);
-    const streak = getStreak(checkin.user_id);
-    const streakText = streak > 1 ? `🔥 Стрик: ${streak} дней подряд!` : '🌱 День первый — начало стрика!';
-
-    await ctx.reply(
-      '✅ День записан!\n\n' +
-      `📅 ${checkin.date}\n` +
-      `😴 Сон: ${checkin.sleep_hours} ч\n` +
-      `🌅 Пробуждение: ${checkin.wake_quality}/10\n` +
-      `🏃 Активность: ${checkin.activity}\n` +
-      `⚡ Энергия: ${checkin.energy}/10\n\n` +
-      streakText
-    );
-    await ctx.reply('🤖 Анализирую день…');
-
-    // Разбор дня и анализ шага к цели — параллельно
-    const [summary, goalResult] = await Promise.all([
-      summarizeReflection(answer, user, checkin),
-      analyzeGoalProgress(answer, user?.goal_year),
-    ]);
-
-    setGoalProgress(checkin.user_id, checkin.date, goalResult.progress ? 1 : 0);
-
-    saveReflection({
-      user_id: String(chatId),
-      date: checkin.date,
-      answers: [answer],
-      summary,
-    });
-
-    // Извлекаем задачи на завтра для утреннего напоминания
-    const tasksMatch = summary.match(/<b>Задачи на завтра<\/b>\n\n([\s\S]+?)(?:\n\n|$)/);
-    const tasksText = tasksMatch ? tasksMatch[1].trim() : '';
-
-    saveUser({
-      user_id: String(chatId),
-      name: user?.name,
-      goal_year: user?.goal_year,
-      priority: user?.priority,
-      reminder_time: user?.reminder_time,
-      onboarded: user?.onboarded ?? 1,
-      last_tomorrow_plan: tasksText,
-    });
-
-    const progressNote = goalResult.progress && goalResult.comment
-      ? `\n\n🎯 ${goalResult.comment}`
-      : '';
-
-    await ctx.replyWithHTML(`📝 Итог дня:\n\n${summary}${progressNote}`, getMainKeyboard());
-
-    // Итог идёт в историю как точка отсчёта разговора
-    pushHistory(chatId,
-      `Рефлексия ${checkin.date}: сон ${checkin.sleep_hours}ч, энергия ${checkin.energy}/10`,
-      summary
-    );
-
+    submission = saveSubmission({userId:String(chatId),updateId:ctx.update.update_id,
+      checkin,replace:session.data.replaceConfirmed === true});
   } catch (err) {
-    log.error('Ошибка рефлексии:', err);
-    if (err.message?.includes('anthropic') || err.status) {
-      await ctx.reply('⚠️ День записан, но AI-разбор временно недоступен.');
-    } else {
-      await ctx.reply('Что-то пошло не так при сохранении. Попробуй ещё раз.');
+    log.error('reflection save failed:', err.message);
+    await ctx.reply('Не удалось сохранить. Ответы остаются в черновике; попробуй отправить итог ещё раз.');
+    return;
+  }
+  session.type = null; session.step = 0; session.data = {};
+  if (submission.duplicate) return;
+  let analysisCompleted = false;
+  try {
+    await ctx.reply('✅ Ответы сохранены. Анализирую день…');
+    const [summary, goalResult] = await Promise.all([
+      summarizeReflection(answer,user,checkin), analyzeGoalProgress(answer,user?.goal_year),
+    ]);
+    const progress = typeof goalResult.progress === 'boolean' ? Number(goalResult.progress) : null;
+    const current = finishSubmission(submission.id,{summary,progress});
+    analysisCompleted = true;
+    if (current) {
+      const tasksMatch = summary.match(/<b>Задачи на завтра<\/b>\n\n([\s\S]+?)(?:\n\n|$)/);
+      saveUser({user_id:String(chatId),last_tomorrow_plan:tasksMatch ? tasksMatch[1].trim() : ''});
+      await ctx.replyWithHTML(`📝 Итог дня:\n\n${summary}`,getMainKeyboard());
+      pushHistory(chatId,`Рефлексия ${checkin.date}`,summary);
     }
+  } catch (err) {
+    if (!analysisCompleted) finishSubmission(submission.id,{failed:true});
+    log.error('reflection analysis/delivery failed:', err.message);
+    await ctx.reply('Ответы сохранены. ИИ-итог пока недоступен; исходная запись не потеряна.',getMainKeyboard());
   }
 }
 
@@ -371,10 +362,27 @@ async function startReflectionOrOnboard(ctx) {
     return;
   }
 
+  if (session.type === 'reflection' && !ctx.state.replaceConfirmed) {
+    const question = REFLECTION_STEPS[session.step]?.question;
+    await ctx.reply('Продолжаем сохранённый черновик. Для отмены — /cancel.');
+    if (question) await ctx.reply(question); else await askReflectionText(ctx,chatId);
+    return;
+  }
+  const today = new Date().toISOString().slice(0,10);
+  if (!ctx.state.replaceConfirmed && getLastNDays(String(chatId),1).some(r=>r.date===today)) {
+    await ctx.reply('Запись за сегодня уже есть. /replace — подтвердить её исправление с сохранением предыдущей версии.');
+    return;
+  }
   await startReflectionFlow(ctx, chatId, session);
 }
 
 bot.command('reflection', startReflectionOrOnboard);
+bot.command('replace', async ctx => { ctx.state.replaceConfirmed=true; await startReflectionOrOnboard(ctx); });
+bot.command('cancel', async ctx => {
+  const session=getSession(ctx.chat.id); session.type=null;session.step=0;session.data={};
+  commitDraftUpdate(String(ctx.chat.id),ctx.update.update_id,session);
+  await ctx.reply('Черновик отменён. Сохранённые записи остаются.',getMainKeyboard());
+});
 
 // Чекин объединён с рефлексией — команда осталась, чтобы не ломать привычку
 bot.command('checkin', async (ctx) => {
@@ -567,6 +575,7 @@ async function handleFreeChat(ctx, chatId, text, session) {
   }
 }
 
+if (require.main === module) {
 bot.launch();
 log.info('🤖 Life OS бот запущен');
 
@@ -580,6 +589,8 @@ bot.telegram.setMyCommands([
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+}
+module.exports = { bot, sessions };
 
 // Обработчики inline-кнопок для анализа
 bot.action('ANALYZE_7', async (ctx) => {
