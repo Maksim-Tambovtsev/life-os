@@ -221,6 +221,8 @@ function getUser(userId) {
 
 // Создаёт или обновляет профиль (INSERT OR REPLACE сохраняет created_at при апдейте)
 function saveUser(obj) {
+  // A partial update must not replace existing fields with create-time defaults.
+  obj = { ...(getUser(obj.user_id) || {}), ...Object.fromEntries(Object.entries(obj).filter(([,v]) => v !== undefined)) };
   const stmt = db.prepare(`
     INSERT INTO users (user_id, name, goal_year, priority, reminder_time, onboarded, last_tomorrow_plan)
     VALUES (@user_id, @name, @goal_year, @priority, @reminder_time, @onboarded, @last_tomorrow_plan)
@@ -365,7 +367,84 @@ function consumeLoginToken(token) {
   return row.user_id;
 }
 
+// Apply and record the persistence migration atomically; surface failures.
+db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)');
+db.transaction(() => {
+  if (db.prepare('SELECT version FROM schema_migrations WHERE version=1').get()) return;
+  db.exec(`
+    CREATE TABLE bot_drafts (user_id TEXT PRIMARY KEY, state TEXT NOT NULL);
+    CREATE TABLE processed_updates (user_id TEXT NOT NULL, update_id TEXT NOT NULL, PRIMARY KEY(user_id,update_id));
+    CREATE TABLE reflection_submissions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, date TEXT NOT NULL,
+      checkin_id INTEGER NOT NULL, reflection_id INTEGER NOT NULL, status TEXT NOT NULL);
+    CREATE TABLE reflection_revisions (id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, date TEXT NOT NULL,
+      snapshot TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')));
+    ALTER TABLE reflections ADD COLUMN submission_id TEXT;
+    ALTER TABLE reflections ADD COLUMN analysis_status TEXT;
+    INSERT INTO schema_migrations(version) VALUES(1);
+  `);
+})();
+
+function getDraft(userId) {
+  const row=db.prepare('SELECT state FROM bot_drafts WHERE user_id=?').get(String(userId));
+  return row ? JSON.parse(row.state) : null;
+}
+function hasProcessedUpdate(userId,updateId) {
+  return !!db.prepare('SELECT 1 FROM processed_updates WHERE user_id=? AND update_id=?').get(String(userId),String(updateId));
+}
+function writeDraft(userId,state) {
+  if (!state.type) db.prepare('DELETE FROM bot_drafts WHERE user_id=?').run(String(userId));
+  else db.prepare('INSERT INTO bot_drafts VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET state=excluded.state')
+    .run(String(userId),JSON.stringify({type:state.type,step:state.step,data:state.data,editField:state.editField}));
+}
+const commitDraftUpdate=db.transaction((userId,updateId,state)=>{
+  if(hasProcessedUpdate(userId,updateId)) return false;
+  writeDraft(userId,state);
+  db.prepare('INSERT INTO processed_updates VALUES(?,?)').run(String(userId),String(updateId));
+  return true;
+});
+const saveSubmission=db.transaction(({userId,updateId,checkin,replace=false})=>{
+  userId=String(userId); updateId=String(updateId);
+  if(String(checkin.user_id)!==userId) throw Error('user mismatch');
+  const id=JSON.stringify([userId,updateId]);
+  const previous=db.prepare('SELECT * FROM reflection_submissions WHERE id=?').get(id);
+  if(previous) return {...previous,duplicate:true};
+  if(hasProcessedUpdate(userId,updateId)) throw Error('update already consumed');
+  const old=db.prepare('SELECT * FROM checkins WHERE user_id=? AND date=? ORDER BY id DESC').all(userId,checkin.date);
+  const refs=db.prepare('SELECT * FROM reflections WHERE user_id=? AND date=? ORDER BY id DESC').all(userId,checkin.date);
+  if(old.length && !replace) throw Error('replacement requires confirmation');
+  if(old.length || refs.length) db.prepare('INSERT INTO reflection_revisions(user_id,date,snapshot) VALUES(?,?,?)').run(userId,checkin.date,JSON.stringify({checkins:old,reflections:refs}));
+  // Keep historical duplicates intact; replace only the current snapshot.
+  let checkinId;
+  if(old.length){
+    checkinId=old[0].id;
+    db.prepare(`UPDATE checkins SET sleep_hours=@sleep_hours,wake_quality=@wake_quality,activity=@activity,
+      energy=@energy,reflection=@reflection,goal_progress=@goal_progress WHERE id=@id`).run({...checkin,id:checkinId});
+  }else checkinId=Number(saveCheckin(checkin).lastInsertRowid);
+  let refId;
+  if(refs.length){
+    refId=refs[0].id;
+    db.prepare("UPDATE reflections SET answers=?,summary=NULL,submission_id=?,analysis_status='pending' WHERE id=?").run(JSON.stringify([checkin.reflection]),id,refId);
+  }else{
+    refId=Number(db.prepare("INSERT INTO reflections(user_id,date,answers,submission_id,analysis_status) VALUES(?,?,?,?,'pending')").run(userId,checkin.date,JSON.stringify([checkin.reflection]),id).lastInsertRowid);
+  }
+  db.prepare("INSERT INTO reflection_submissions VALUES(?,?,?,?,?,'pending')").run(id,userId,checkin.date,checkinId,refId);
+  writeDraft(userId,{type:null});
+  db.prepare('INSERT INTO processed_updates VALUES(?,?)').run(userId,updateId);
+  return {id,user_id:userId,checkin_id:checkinId,reflection_id:refId,status:'pending',duplicate:false};
+});
+const finishSubmission=db.transaction((id,{summary=null,progress=null,failed=false})=>{
+  const s=db.prepare('SELECT * FROM reflection_submissions WHERE id=?').get(id);
+  if(!s) throw Error('unknown submission');
+  const status=failed?'failed':'succeeded';
+  db.prepare('UPDATE reflection_submissions SET status=? WHERE id=?').run(status,id);
+  const changed=db.prepare('UPDATE reflections SET summary=?,analysis_status=? WHERE id=? AND submission_id=?')
+    .run(summary,status,s.reflection_id,id).changes;
+  if(changed) db.prepare('UPDATE checkins SET goal_progress=? WHERE id=?').run(progress,s.checkin_id);
+  return changed>0;
+});
+
 module.exports = {
+  getDraft, hasProcessedUpdate, commitDraftUpdate, saveSubmission, finishSubmission,
   saveCheckin, getAll, getLastNDays, getStreak,
   getUser, saveUser, isOnboarded, getAllUsers,
   setGoalProgress, getGoalProgressStats, getGoalStreak,

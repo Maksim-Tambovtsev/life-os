@@ -54,7 +54,7 @@ async function chatReply({ message, mode, user = null, recentCheckins = [], hist
  * @returns {Promise<{progress: boolean, comment: string}>}
  */
 async function analyzeGoalProgress(reflection, goal) {
-  if (!reflection || !goal) return { progress: false, comment: '' };
+  if (!reflection || !goal) return { progress: null, comment: '' };
 
   const prompt =
     `Цель пользователя: ${goal}.\n` +
@@ -75,13 +75,14 @@ async function analyzeGoalProgress(reflection, goal) {
       .replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
 
     const parsed = JSON.parse(text);
+    if (typeof parsed.progress !== 'boolean') throw new Error('invalid progress type');
     return {
-      progress: Boolean(parsed.progress),
+      progress: parsed.progress,
       comment: parsed.comment || '',
     };
   } catch (e) {
     log.error('analyzeGoalProgress error:', e.message);
-    return { progress: false, comment: '' };
+    return { progress: null, comment: '' };
   }
 }
 
